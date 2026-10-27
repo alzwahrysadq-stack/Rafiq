@@ -1,18 +1,14 @@
 name: Unpack Candidate Zip
-
 on:
   push:
-    branches:
-      - candidate-upload
-    paths:
-      - 'incoming/**.zip'
+    branches: [candidate-upload]
+    paths: ['incoming/**.zip']
 
 jobs:
   unpack:
     runs-on: ubuntu-latest
     permissions:
       contents: write
-
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -31,7 +27,6 @@ jobs:
         run: |
           mkdir -p _unpacked
           unzip -o "${{ steps.findzip.outputs.zip_file }}" -d _unpacked
-          echo "--- محتوى الملف بعد الفك ---"
           find _unpacked -maxdepth 2
 
       - name: Copy files into repository
