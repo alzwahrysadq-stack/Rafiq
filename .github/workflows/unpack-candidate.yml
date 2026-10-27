@@ -28,6 +28,7 @@ jobs:
           mkdir -p _unpacked
           unzip -o "${{ steps.findzip.outputs.zip_file }}" -d _unpacked
           find _unpacked -maxdepth 2
+          rm -rf _unpacked/.github/workflows
 
       - name: Copy files into repository
         run: |
