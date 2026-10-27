@@ -1,1 +1,53 @@
+name: Unpack Candidate Zip
 
+on:
+  push:
+    branches:
+      - candidate-upload
+    paths:
+      - 'incoming/**.zip'
+
+jobs:
+  unpack:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          ref: candidate-upload
+          fetch-depth: 0
+
+      - name: Find zip file
+        id: findzip
+        run: |
+          ZIP_FILE=$(find incoming -name '*.zip' | head -n 1)
+          echo "Found: $ZIP_FILE"
+          echo "zip_file=$ZIP_FILE" >> "$GITHUB_OUTPUT"
+
+      - name: Unzip into staging folder
+        run: |
+          mkdir -p _unpacked
+          unzip -o "${{ steps.findzip.outputs.zip_file }}" -d _unpacked
+          echo "--- محتوى الملف بعد الفك ---"
+          find _unpacked -maxdepth 2
+
+      - name: Copy files into repository
+        run: |
+          SRC="_unpacked"
+          if [ "$(ls -A $SRC | wc -l)" -eq 1 ] && [ -d "$SRC"/*/ ]; then
+            SRC="$SRC/$(ls $SRC)"
+          fi
+          cp -rf "$SRC"/. .
+          rm -rf _unpacked
+          rm -f "${{ steps.findzip.outputs.zip_file }}"
+
+      - name: Commit and push
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -m "فك ضغط ودمج النسخة المرشحة تلقائياً" || echo "لا توجد تغييرات"
+          git push origin candidate-upload
