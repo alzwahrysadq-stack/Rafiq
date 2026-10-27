@@ -1,0 +1,69 @@
+{% extends "base.html" %}
+{% block title %}الأصناف{% endblock %}
+{% block content %}
+<div class="row">
+  <div class="h1 grow">الأصناف <span class="pill b">{{ count }}</span></div>
+  {% if low %}<div class="pill a">{{ low }} قارب على النفاد</div>{% endif %}
+</div>
+<div class="row wrap mt" style="gap:8px">
+  <a class="btn sm {{ 'amber' if expiry_alert else 'ghost' }}" href="/products?expiry_alert=1">⏳ صلاحية منتهية أو خلال {{ expiry_days }} يوماً: {{ expiry_total }}</a>
+  {% if expiry_alert %}<a class="btn sm ghost" href="{{ url_for('products') }}">عرض كل الأصناف</a>{% endif %}
+</div>
+<div class="hint mt">لكل صنف تاريخ انتهاء واحد فقط. القائمة تعرض الأصناف ذات الرصيد المسجل الموجب، ولا تمثل الدفعات متعددة الصلاحية أو إشعارات نظام الهاتف.</div>
+
+<div class="card mt">
+  <form method="get" class="row">
+    <input name="q" value="{{ q }}" placeholder="ابحث بالاسم أو الباركود…" class="grow">
+    <button class="btn p">بحث</button>
+  </form>
+  <div class="btn-grid mt">
+    <a class="btn p" href="{{ url_for('product_new') }}">➕ صنف جديد</a>
+    <a class="btn ghost" href="{{ url_for('imports') }}">⬆️ استيراد من ملف</a>
+  </div>
+</div>
+
+<!-- إضافة يدوية سريعة: صنف بلا مغادرة القائمة (يرجع إليها عند الخطأ أو النجاح) -->
+<div class="card mt">
+  <div class="h2">➕ إضافة صنف يدوياً</div>
+  <form method="post" action="{{ url_for('product_new') }}">
+    <input type="hidden" name="back" value="products">
+    <label>اسم الصنف *</label>
+    <input name="name" required placeholder="مثال: زيت عافية 1 لتر">
+    <div class="row">
+      <div class="grow"><label>الباركود (اختياري)</label><input name="barcode" autocomplete="off"></div>
+      <div class="grow"><label>سعر البيع *</label><input name="price" inputmode="decimal" required></div>
+    </div>
+    <div class="row">
+      <div class="grow"><label>الرصيد</label><input name="stock" inputmode="decimal" placeholder="0"></div>
+      <div class="grow"><label>الممر</label><input name="aisle" placeholder="3"></div>
+      <div class="grow"><label>الرف</label><input name="shelf" placeholder="ب"></div>
+    </div>
+    <button class="btn p wide mt">💾 إضافة الصنف</button>
+  </form>
+</div>
+
+<div class="card tight">
+  <div class="scroll-x">
+  <table class="tbl">
+    <tr><th>الصنف</th><th>الباركود</th><th>السعر</th><th>الرصيد</th><th>الموقع</th><th>الانتهاء</th><th></th></tr>
+    {% for p in rows %}
+      <tr>
+        <td><b>{{ p.name }}</b><div class="muted small">{{ p.unit }}{% if p.category %} • {{ p.category }}{% endif %}</div></td>
+        <td class="small">{{ p.barcode or '—' }}</td>
+        <td>{{ p.price_cents|money }}</td>
+        <td>
+          {% if p.stock <= p.low_stock %}<span class="pill a">{{ '%g'|format(p.stock) }} ⚠</span>
+          {% else %}{{ '%g'|format(p.stock) }}{% endif %}
+          {% if p.shared_stock_with %}<div class="muted small">↔ رصيد مشترك</div>{% endif %}
+        </td>
+        <td class="small">{% if loc_text(p) %}<span class="loc-chip">📍 {{ loc_text(p) }}</span>{% else %}—{% endif %}</td>
+        <td class="small">{{ p.expiry or '—' }}</td>
+        <td><a class="btn sm ghost" href="{{ url_for('product_edit', pid=p.id) }}">تعديل</a></td>
+      </tr>
+    {% endfor %}
+    {% if not rows %}<tr><td colspan="7" class="center muted mt">{{ 'لا توجد أصناف بهذه الصلاحية' if expiry_alert else 'لا أصناف — أضف يدوياً أو استورد من ملف «الأمين»' }}</td></tr>{% endif %}
+  </table>
+  </div>
+  {% if rows|length == 500 %}<div class="hint">عُرضت أول 500 نتيجة — استخدم البحث للتضييق.</div>{% endif %}
+</div>
+{% endblock %}

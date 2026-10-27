@@ -1,0 +1,129 @@
+{% extends "base.html" %}
+{% block title %}{{ 'تعديل صنف' if p else 'صنف جديد' }}{% endblock %}
+{% block content %}
+<div class="row product-head">
+  <div class="h1 grow">{{ 'تعديل صنف' if p else 'صنف جديد' }}</div>
+  <a class="btn sm ghost" href="{{ url_for('products') }}">← القائمة</a>
+</div>
+
+<div class="card mt product-card">
+  <form method="post" class="product-form">
+    <div class="product-fields">
+      <div class="field wide">
+        <label for="productName">اسم الصنف *</label>
+        <input id="productName" name="name" required value="{{ p.name if p else '' }}">
+      </div>
+      <div class="field wide">
+        <label for="bc">الباركود (بالكاميرا أو القارئ أو الكتابة)</label>
+        <div class="scan-field">
+          <input name="barcode" id="bc" value="{{ p.barcode if p and p.barcode else '' }}" autocomplete="off" inputmode="numeric">
+          <button type="button" class="btn blue" id="bcCam">📷 تصوير</button>
+        </div>
+      </div>
+      <div class="field wide">
+        <label for="sharedRoot">رصيد هذا الوجه عند تكرار الباركود</label>
+        <select id="sharedRoot" name="shared_stock_with" data-current="{{ p.shared_stock_with if p and p.shared_stock_with else '' }}">
+          <option value="">رصيد مستقل لهذا الوجه (مثل أنواع البن المختلفة)</option>
+          {% for r in share_choices %}
+            <option value="{{ r.id }}" {% if p and p.shared_stock_with == r.id %}selected{% endif %}>رصيد مشترك مع «{{ r.name }}» (المتاح {{ r.stock }})</option>
+          {% endfor %}
+        </select>
+        <div class="hint">إذا كانت الأوجه تسحب من نفس الكمية الفعلية (مثل أسعار الماء من عبوة واحدة)، أدخل الباركود نفسه واختر الصنف الأساسي. أنشئ الصنف الأساسي أولاً. تُخصم الكمية من رصيده فقط، أما اسم هذا الوجه وسعره فمستقلان. تعديل باركود الصنف الأساسي يحدّث باركود أوجهه المشتركة معه معاً.</div>
+      </div>
+      <div class="field">
+        <label for="productUnit">الوحدة</label>
+        <input id="productUnit" name="unit" value="{{ p.unit if p else 'حبة' }}">
+      </div>
+      <div class="field">
+        <label for="productCategory">التصنيف</label>
+        <input id="productCategory" name="category" value="{{ p.category if p else '' }}">
+      </div>
+      <div class="field">
+        <label for="productCost">سعر الشراء</label>
+        <input id="productCost" name="cost" inputmode="decimal" value="{{ (p.cost_cents/100) if p else '' }}">
+      </div>
+      <div class="field">
+        <label for="productPrice">سعر البيع *</label>
+        <input id="productPrice" name="price" inputmode="decimal" required value="{{ (p.price_cents/100) if p else '' }}">
+      </div>
+      <div class="field">
+        <label for="productStock">الرصيد الحالي</label>
+        <input id="productStock" name="stock" inputmode="decimal" value="{{ ('%g'|format(p.stock)) if p else '0' }}">
+      </div>
+      <div class="field">
+        <label for="productLow">حد التنبيه (النواقص)</label>
+        <input id="productLow" name="low_stock" inputmode="decimal" value="{{ ('%g'|format(p.low_stock)) if p else S.low_stock_default }}">
+      </div>
+      <div class="field">
+        <label for="productAisle">الممر (اختياري)</label>
+        <input id="productAisle" name="aisle" placeholder="مثال: 3" value="{{ p.aisle if p else '' }}">
+      </div>
+      <div class="field">
+        <label for="productShelf">الرف (اختياري)</label>
+        <input id="productShelf" name="shelf" placeholder="مثال: ب" value="{{ p.shelf if p else '' }}">
+      </div>
+      <div class="product-note muted">اترك الممر والرف فارغين إن لم تحدد موقعاً — لا يعطّلان الحفظ.</div>
+      <div class="field wide">
+        <label for="productExpiry">تاريخ الانتهاء (اختياري — التنبيه على الصنف ذي الرصيد الفعلي)</label>
+        <input id="productExpiry" name="expiry" type="date" value="{{ p.expiry if p and p.expiry else '' }}">
+      </div>
+    </div>
+    <div class="btn-grid product-actions">
+      <button type="submit" class="btn p">💾 حفظ</button>
+      <a class="btn ghost" href="{{ url_for('products') }}">إلغاء</a>
+    </div>
+  </form>
+</div>
+{% endblock %}
+{% block scripts %}
+<script>
+const sharedSelect = document.getElementById('sharedRoot');
+const savedShared = sharedSelect.dataset.current || '';
+let pendingShared = savedShared;
+const currentProductId = {{ p.id if p else 0 }};
+let rootLookupSeq = 0;
+function stockInputs(){
+  const linked = !!sharedSelect.value;
+  ['productStock', 'productLow', 'productExpiry'].forEach(id => {
+    document.getElementById(id).disabled = linked;
+  });
+}
+sharedSelect.onchange = function(){
+  if (!this.value && this.dataset.wasLinked === 'yes') {
+    // لا تنسخ الرصيد المشترك بأكمله إلى الوجه عند فصله؛ اطلب من المالك إدخاله.
+    document.getElementById('productStock').value = '0';
+    document.getElementById('productExpiry').value = '';
+  }
+  this.dataset.wasLinked = this.value ? 'yes' : 'no';
+  stockInputs();
+};
+sharedSelect.dataset.wasLinked = savedShared ? 'yes' : 'no';
+stockInputs();
+async function fillStockRoots(){
+  const code = document.getElementById('bc').value.trim();
+  const seq = ++rootLookupSeq;
+  const selected = sharedSelect.value || pendingShared;
+  pendingShared = '';
+  sharedSelect.innerHTML = '<option value="">رصيد مستقل لهذا الوجه (مثل أنواع البن المختلفة)</option>';
+  if (!code) { stockInputs(); return; }
+  const j = await api('/api/find', {code});
+  if (seq !== rootLookupSeq || document.getElementById('bc').value.trim() !== code) return;
+  const options = (j.choices || (j.product ? [j.product] : []));
+  options.filter(p => p.barcode === code && p.id !== currentProductId && !p.shared_stock_with).forEach(p => {
+    const opt = document.createElement('option');
+    opt.value = String(p.id);
+    opt.textContent = 'رصيد مشترك مع «' + p.name + '» (المتاح ' + p.stock + ')';
+    sharedSelect.appendChild(opt);
+  });
+  sharedSelect.value = selected;
+  if (sharedSelect.value !== selected) sharedSelect.value = '';
+  stockInputs();
+}
+document.getElementById('bc').addEventListener('change', fillStockRoots);
+document.getElementById('bc').addEventListener('blur', fillStockRoots);
+function putBarcode(code){ const b=document.getElementById('bc'); b.value=code; fillStockRoots(); beep(); vib(); }
+watchScanner(putBarcode);
+document.getElementById('bcCam').onclick = ()=> openCameraScanner(putBarcode);
+fillStockRoots();
+</script>
+{% endblock %}

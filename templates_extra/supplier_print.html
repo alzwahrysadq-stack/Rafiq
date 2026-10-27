@@ -1,0 +1,29 @@
+{% extends "base.html" %}
+{% block title %}كشف حساب {{ s.name }}{% endblock %}
+{% block wrap %}
+<div class="wrap">
+  <div class="row no-print">
+    <div class="h1 grow">كشف حساب مورد: {{ s.name }}</div>
+    <button class="btn sm p" onclick="window.print()">🖨 طباعة</button>
+  </div>
+  <div class="a4 mt">
+    {% if S.store_logo %}<img src="{{ S.store_logo }}" alt="" style="max-height:70px;display:block;margin:0 auto 6px">{% endif %}
+    <h2>{{ S.store_name or 'المتجر' }}</h2>
+    <div class="center">كشف حساب مورد</div>
+    <table>
+      <tr><td>المورد</td><td>{{ s.name }}</td></tr>
+      <tr><td>الهاتف</td><td dir="ltr">{{ s.phone }}</td></tr>
+      <tr><td>تاريخ الطباعة</td><td>{{ today }}</td></tr>
+    </table>
+    <table>
+      <tr><th>التاريخ</th><th>النوع</th><th>البيان</th><th>المبلغ</th><th>الرصيد الجاري</th></tr>
+      {% for e in ev %}
+      <tr><td>{{ e.ts }}</td><td>{{ e.label }}</td><td>{{ e.note }}</td><td>{{ e.amount_fmt }}</td><td>{{ e.balance_fmt }}</td></tr>
+      {% else %}
+      <tr><td colspan="5">لا توجد حركات</td></tr>
+      {% endfor %}
+    </table>
+    <div class="grand mt">الرصيد الحالي: {{ s.balance_fmt }}</div>
+  </div>
+</div>
+{% endblock %}

@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">رفيق</string>
+    <string name="db_ready">قاعدة البيانات جاهزة — عدد المستخدمين: %1$d</string>
+</resources>

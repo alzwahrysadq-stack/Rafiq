@@ -1,0 +1,148 @@
+{% extends "base.html" %}
+{% block title %}فاتورة {{ inv.number }}{% endblock %}
+{% block bodyclass %}invoice-page {{ 'has-a4' if a4 else 'receipt-only' }}{% endblock %}
+{% block wrap %}
+<div class="wrap">
+  <div class="invoice-tools no-print">
+    <div class="invoice-tools-top">
+      <div class="h1">فاتورة رقم {{ inv.number }}</div>
+      <a class="btn sm ghost" href="{{ url_for('pos') }}">← رجوع للبيع</a>
+    </div>
+    <div class="invoice-actions">
+      <a class="btn sm ghost" href="{{ url_for('invoice', iid=inv.id, a4=0 if a4 else 1) }}">
+        {{ 'معاينة حرارية' if a4 else 'معاينة A4' }}</a>
+      <button type="button" class="btn sm p" onclick="printInvoice('a4')">🖨 طباعة A4</button>
+      <button type="button" class="btn sm p" onclick="printInvoice('receipt')">🧾 طباعة حرارية</button>
+      <button type="button" class="btn sm p" onclick="printInvoice('both')">🖨 طباعة الاثنين</button>
+      {% if customer and customer.phone and inv.status == 'open' %}
+      <button type="button" class="btn sm blue" id="shareInvoicePdf" onclick="shareInvoicePdf()">📤 مشاركة PDF للزبون</button>
+      {% endif %}
+    </div>
+  </div>
+
+  {% if inv.status == 'cancelled' %}
+    <div class="flash error mt no-print">هذه الفاتورة <b>ملغاة</b> — أُعيد المخزون ورُد النقد المسجّل إن وجد.</div>
+  {% endif %}
+
+  <div class="mt2"></div>
+
+  <!-- ===== نسخة حرارية 80مم ===== -->
+  <div class="receipt">
+    {% if S.store_logo %}<img class="logo-mono" src="{{ S.store_logo }}" alt="">{% endif %}
+    <h3>{{ S.store_name }}</h3>
+    {% if S.store_phone %}<div class="center" dir="ltr">{{ S.store_phone }}</div>{% endif %}
+    <div class="line"></div>
+    <table>
+      <tr><td>فاتورة رقم</td><td class="tl"><b>{{ inv.number }}</b></td></tr>
+      <tr><td>التاريخ</td><td class="tl"><bdi dir="ltr">{{ inv.created_at }}</bdi></td></tr>
+      <tr><td>الموظف</td><td class="tl">{{ worker.name if worker else '' }}</td></tr>
+      {% if customer %}<tr><td>الزبون</td><td class="tl">{{ customer.name }}</td></tr>{% endif %}
+      <tr><td>الدفع</td><td class="tl">{{ 'نقدي' if inv.payment_type=='cash' else 'آجل' }}</td></tr>
+      {% for p in payments %}<tr><td>{{ p.label }}</td><td class="tl">{{ p.amount }}{% if p.ref %} — مرجع {{ p.ref }}{% endif %}</td></tr>{% endfor %}
+    </table>
+    <div class="line"></div>
+    <table>
+      <tr><th>الصنف</th><th>كمية</th><th>سعر</th><th class="tl">إجمالي</th></tr>
+      {% for it in items %}
+      <tr>
+        <td>{{ it.name }}</td>
+        <td>{{ '%g'|format(it.qty) }}</td>
+        <td>{{ it.price_cents|money }}</td>
+        <td class="tl">{{ it.total_cents|money }}</td>
+      </tr>
+      {% endfor %}
+    </table>
+    <div class="line"></div>
+    <table>
+      <tr><td>المجموع</td><td class="tl">{{ inv.subtotal_cents|money }}</td></tr>
+      {% if inv.discount_cents %}<tr><td>الخصم</td><td class="tl">- {{ inv.discount_cents|money }}</td></tr>{% endif %}
+      <tr class="grand"><td>الإجمالي</td><td class="tl">{{ inv.total_cents|money }} {{ S.currency }}</td></tr>
+      {% if inv.payment_type=='cash' %}
+        <tr><td>المستلم</td><td class="tl">{{ (inv.received_cents or inv.total_cents)|money }}</td></tr>
+        <tr><td>الباقي</td><td class="tl">{{ (inv.change_cents or 0)|money }}</td></tr>
+      {% else %}
+        <tr><td>دُفع الآن</td><td class="tl">{{ inv.paid_cents|money }}</td></tr>
+        <tr class="grand"><td>الباقي ديناً</td><td class="tl">{{ inv.due_cents|money }} {{ S.currency }}</td></tr>
+      {% endif %}
+    </table>
+    <div class="line"></div>
+    <div class="center">{{ S.invoice_footer }}</div>
+    
+  </div>
+
+  <!-- ===== نسخة A4 ===== -->
+  <div class="a4">
+    <div class="head">
+      <div>
+        {% if S.store_logo %}<img class="logo-mono" style="margin:0 0 4px" src="{{ S.store_logo }}" alt="">{% endif %}
+        <h2 style="margin:0">{{ S.store_name }}</h2>
+        {% if S.store_phone %}<div>هاتف: {{ S.store_phone }}</div>{% endif %}
+      </div>
+      <div style="text-align:left">
+        <div><b>فاتورة رقم: {{ inv.number }}</b></div>
+        <div dir="ltr">{{ inv.created_at }}</div>
+        <div>الموظف: {{ worker.name if worker else '' }}</div>
+      </div>
+    </div>
+    {% if customer %}
+      <div><b>الزبون:</b> {{ customer.name }} {% if customer.phone %} — {{ customer.phone }}{% endif %}</div>
+    {% endif %}
+    <div><b>طريقة الدفع:</b> {{ 'نقدي' if inv.payment_type=='cash' else 'آجل' }}
+      {% if inv.status=='cancelled' %}<span style="color:#b91c1c"> — ملغاة</span>{% endif %}</div>
+    <table>
+      <thead><tr><th style="width:40px">#</th><th>الصنف</th><th>الوحدة</th><th>الكمية</th><th>السعر</th><th>الإجمالي</th></tr></thead>
+      <tbody>
+      {% for it in items %}
+        <tr><td>{{ loop.index }}</td><td>{{ it.name }}</td><td>{{ it.unit }}</td>
+            <td>{{ '%g'|format(it.qty) }}</td><td>{{ it.price_cents|money }}</td><td>{{ it.total_cents|money }}</td></tr>
+      {% endfor %}
+      </tbody>
+    </table>
+    <table class="invoice-totals">
+      <tr><td>المجموع</td><td>{{ inv.subtotal_cents|money }}</td></tr>
+      {% if inv.discount_cents %}<tr><td>الخصم</td><td>- {{ inv.discount_cents|money }}</td></tr>{% endif %}
+      <tr><td><b>الإجمالي</b></td><td><b>{{ inv.total_cents|money }} {{ S.currency }}</b></td></tr>
+      <tr><td>المدفوع</td><td>{{ inv.paid_cents|money }}</td></tr>
+      <tr><td>الباقي</td><td>{{ inv.due_cents|money }}</td></tr>
+    </table>
+    <div class="center" style="margin-top:26px">{{ S.invoice_footer }}</div>
+  </div>
+
+
+
+  {% if u and u.role=='owner' and inv.status=='open' %}
+  <div class="card no-print">
+    <div class="h2">إلغاء الفاتورة (للمالك فقط)</div>
+    <div class="muted small mt">الفاتورة تعود للمخزون وتُخرج قيمتها النقدية من الصندوق تلقائياً.</div>
+    <form method="POST" action="{{ url_for('invoice_cancel', iid=inv.id) }}" class="mt"
+          onsubmit="return confirm('تأكيد إلغاء الفاتورة رقم {{ inv.number }}؟')">
+      <button class="btn red">إلغاء الفاتورة</button>
+    </form>
+  </div>
+  {% endif %}
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+function printInvoice(mode){
+  document.body.classList.remove('print-a4', 'print-receipt', 'print-both');
+  document.body.classList.add('print-' + mode);
+  // ترك فرصة للمتصفح لتطبيق تنسيق الورق قبل إنشاء مستند الطباعة الأصلي.
+  requestAnimationFrame(() => window.print());
+}
+function shareInvoicePdf(){
+  if(!window.RafiqDevice || !window.RafiqDevice.shareInvoicePdf){
+    toast('مشاركة PDF متاحة داخل تطبيق Android فقط','err'); return;
+  }
+  {% if customer and customer.phone and inv.status == 'open' %}
+  const name = {{ customer.name|tojson }}, phone = {{ customer.phone|tojson }};
+  if(!confirm('فاتورة رقم {{ inv.number }}، الإجمالي {{ inv.total_cents|money }} {{ S.currency }}.\n'
+    +'الزبون: '+name+'، هاتفه: '+phone+'، دينه الحالي: {{ customer.balance_cents|money }} {{ S.currency }}.\n'
+    +'بعد المتابعة اختر تطبيق الإرسال والمستلم الصحيح بنفسك؛ فتح القائمة لا يعني أن الفاتورة أُرسلت.')) return;
+  window.RafiqDevice.shareInvoicePdf({{ inv.id }});
+  {% endif %}
+}
+{% if autoprint %}window.addEventListener('load', ()=> setTimeout(()=>window.print(), 400));{% endif %}
+</script>
+{% endblock %}

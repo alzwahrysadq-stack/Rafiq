@@ -1,0 +1,106 @@
+{% extends "base.html" %}
+{% block title %}تقرير درج النقود{% endblock %}
+{% block content %}
+
+<!-- ترويسة ورقية: تظهر عند الطباعة فقط -->
+<div class="print-head">
+  {% if S.store_logo %}<img src="{{ S.store_logo }}" alt="">{% endif %}
+  <div><div class="t">{{ S.store_name or "المتجر" }}</div>
+       <div class="s">{{ S.store_name }} • تقرير درج النقود • {{ d }}</div></div>
+</div>
+
+<div class="row no-print">
+  <div class="h1 grow">💵 تقرير درج النقود</div>
+  <button class="btn sm p" onclick="window.print()">🖨 طباعة</button>
+</div>
+
+<div class="card mt no-print">
+  <form method="get" class="row wrap">
+    <input type="date" name="date" value="{{ d }}" class="grow" style="min-width:150px">
+    <button class="btn p">عرض</button>
+    <a class="btn ghost" href="{{ url_for('cash_report') }}">اليوم</a>
+    <a class="btn ghost" href="{{ url_for('cash') }}">الصندوق</a>
+  </form>
+</div>
+
+{% if not blocks %}
+  <div class="flash error mt">لا توجد وردية مسجّلة في هذا اليوم.</div>
+{% endif %}
+
+{% for b in blocks %}
+{% set sh = b.shift %}
+<div class="card mt">
+  <div class="row wrap">
+    <div class="h2 grow">الوردية رقم {{ sh.id }}</div>
+    {% if sh.status == 'closed' %}
+      <span class="pill gray">مغلقة</span>
+    {% else %}
+      <span class="pill g">مفتوحة الآن</span>
+    {% endif %}
+  </div>
+  <div class="small muted">
+    فتح: {{ sh.opened_at }} • {{ sh.opener or '—' }}
+    {% if sh.status == 'closed' %} • أغلق: {{ sh.closed_at }} • {{ sh.closer or '—' }}{% endif %}
+  </div>
+
+  <!-- خلاصة الحساب -->
+  <table class="kashf mt">
+    <tr><td>العهدة (بداية الوردية)</td><td class="n">{{ b.tot.open|money }}</td></tr>
+    <tr><td>+ مبيعات نقدية</td><td class="n g">{{ b.tot.sale|money }}</td></tr>
+    <tr><td>+ تحصيل ديون</td><td class="n g">{{ b.tot.collection|money }}</td></tr>
+    <tr><td>+ إيداعات يدوية</td><td class="n g">{{ b.tot.income|money }}</td></tr>
+    <tr><td>− مصروفات</td><td class="n r">{{ b.tot.expense|abs|money }}</td></tr>
+    <tr><td>− سحب المالك</td><td class="n r">{{ b.tot.withdraw|abs|money }}</td></tr>
+    <tr><td>− سداد موردين</td><td class="n r">{{ b.tot.supplier_pay|abs|money }}</td></tr>
+    <tr><td>− إلغاء فواتير</td><td class="n r">{{ b.tot.cancel|abs|money }}</td></tr>
+    <tr class="total"><td>المفروض في الدرج</td><td class="n">{{ b.expected|money }} {{ S.currency }}</td></tr>
+    {% if sh.status == 'closed' %}
+      <tr><td>المعدود فعلياً</td><td class="n">{{ b.counted|money }}</td></tr>
+      <tr class="total {{ 'g' if b.diff == 0 else 'r' }}">
+        <td>{{ 'مطابق ✔' if b.diff == 0 else ('زيادة' if b.diff > 0 else 'عجز') }}</td>
+        <td class="n">{{ b.diff|money }}</td></tr>
+      {% if b.diff != 0 %}
+        <tr><td>سبب الفارق</td><td class="n">{{ b.diff_reason }}</td></tr>
+      {% endif %}
+    {% else %}
+      <tr><td>المعدود فعلياً</td><td class="n muted">لم تُجرد بعد</td></tr>
+    {% endif %}
+  </table>
+
+  <!-- سجل الحركات -->
+  <div class="h2 mt2">سجل الحركات <span class="chipb">{{ b.movs|length }}</span></div>
+  <div class="ledger">
+    {% for m in b.movs %}
+      <div class="rowline">
+        <span class="circ {{ 'dn' if m.amount_cents>=0 else 'up' }}">{{ '+' if m.amount_cents>=0 else '−' }}</span>
+        <span class="who">
+          <span class="nm">{{ m.reason or m.note or K.get(m.kind, m.kind) }}</span>
+          <span class="sub">{{ m.created_at | slice(5, 16) }} • {{ K.get(m.kind, m.kind) }}
+            {% if m.note and m.reason %} • {{ m.note }}{% endif %}
+            • {{ m.uname or '—' }}</span>
+        </span>
+        <span class="amt">
+          <div class="a {{ 'g' if m.amount_cents>=0 else 'r' }}">{{ m.amount_cents|money }}</div>
+        </span>
+      </div>
+    {% endfor %}
+    {% if not b.movs %}<div class="center muted" style="padding:18px">لا حركات</div>{% endif %}
+  </div>
+</div>
+{% endfor %}
+
+{% if blocks|length > 1 %}
+<div class="card mt">
+  <div class="h2">حصيلة اليوم كاملاً</div>
+  <table class="kashf">
+    <tr><td>إجمالي الدخل (بلا العهدة)</td><td class="n g">{{ day_in|money }}</td></tr>
+    <tr><td>إجمالي الخروج</td><td class="n r">{{ day_out|money }}</td></tr>
+    <tr class="total"><td>الصافي</td><td class="n">{{ (day_in - day_out)|money }} {{ S.currency }}</td></tr>
+  </table>
+</div>
+{% endif %}
+
+<div class="card mt no-print">
+  <a class="btn ghost wide" href="{{ url_for('reports') }}">← الرجوع للتقارير</a>
+</div>
+{% endblock %}

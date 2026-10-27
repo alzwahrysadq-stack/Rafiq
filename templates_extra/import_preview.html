@@ -1,0 +1,64 @@
+{% extends "base.html" %}
+{% block title %}مراجعة الاستيراد{% endblock %}
+{% block content %}
+<div class="row">
+  <div class="h1 grow">{{ 'مراجعة الأصناف' if kind=='products' else 'مراجعة الديون' }}</div>
+  <a class="btn sm ghost" href="{{ url_for('imports') }}">← رجوع</a>
+</div>
+<div class="muted small">الملف: {{ filename }}</div>
+
+<div class="grid g3 mt">
+  <div class="stat green"><div class="lbl">صفوف سليمة</div><div class="val">{{ ok }}</div></div>
+  <div class="stat amber"><div class="lbl">تحتاج انتباهك</div><div class="val">{{ warn }}</div></div>
+  <div class="stat red"><div class="lbl">أخطاء (ستُتجاوز)</div><div class="val">{{ err }}</div></div>
+</div>
+
+<div class="card mt">
+  <div class="h2">معاينة أول {{ [records|length, 200]|min }} صف من {{ records|length }}</div>
+  <div class="hint">هذه معاينة فقط. راجع سعر الشراء <b>وسعر البيع</b> والباركود مع العبوة قبل الاعتماد؛ الأصناف الموجودة بنفس الباركود أو الاسم ستتحدّث أسعارها. غياب عمود الكمية يترك رصيد الموجود كما هو ويجعل رصيد الجديد صفراً. <b>تنبيه EAN‑13 لا يمنع الاستيراد ولا يثبت ارتباط الرمز بالمنتج: افحص العبوة بنفسك.</b> <b>لا يوجد زر تراجع أو حذف جماعي؛ لا تختبر ملفاً غير مؤكّد على بيانات متجرك.</b></div>
+  <div class="scroll-x mt">
+  <table class="tbl">
+    {% if kind=='products' %}
+      <tr><th>#</th><th>الحالة</th><th>الاسم</th><th>الباركود</th><th>سعر الشراء</th><th>سعر البيع</th><th>الكمية</th><th>الانتهاء</th></tr>
+      {% for r in records | slice(0, 200) %}
+        <tr>
+          <td class="small">{{ r.row }}</td>
+          <td>{% if r.status=='ok' %}<span class="pill g">جاهز</span>
+              {% elif r.status=='warn' %}<span class="pill a">تنبيه</span>
+              {% else %}<span class="pill r">خطأ</span>{% endif %}
+              {% if r.error %}<div class="small muted">{{ r.error }}</div>{% endif %}</td>
+          <td>{{ r.name }}</td><td class="small">{{ r.barcode or '—' }}</td>
+          <td>{{ r.cost_cents|money }}</td><td><b>{{ r.price_cents|money }}</b></td>
+          <td>{% if r.stock_provided %}{{ '%g'|format(r.stock) }}{% else %}غير محددة (الموجود محفوظ، الجديد 0){% endif %}</td>
+          <td class="small">{{ r.expiry or '—' }}</td>
+        </tr>
+      {% endfor %}
+    {% else %}
+      <tr><th>#</th><th>الحالة</th><th>الزبون</th><th>الهاتف</th><th>الدين</th></tr>
+      {% for r in records | slice(0, 200) %}
+        <tr>
+          <td class="small">{{ r.row }}</td>
+          <td>{% if r.status=='ok' %}<span class="pill g">جاهز</span>
+              {% elif r.status=='warn' %}<span class="pill a">تنبيه</span>
+              {% else %}<span class="pill r">خطأ</span>{% endif %}
+              {% if r.error %}<div class="small muted">{{ r.error }}</div>{% endif %}</td>
+          <td>{{ r.name }}</td><td class="small">{{ r.phone or '—' }}</td>
+          <td>{{ r.amount_cents|money }}</td>
+        </tr>
+      {% endfor %}
+    {% endif %}
+  </table>
+  </div>
+</div>
+
+<form method="POST" action="{{ url_for('imports_commit') }}"
+      onsubmit="return confirm('تأكيد حفظ الأصناف؟ ستتغيّر أسعار الأصناف الموجودة، ولا يوجد تراجع جماعي عن الاستيراد. الصفوف ذات الخطأ ستُتجاوز.')">
+  <input type="hidden" name="kind" value="{{ kind }}">
+  <input type="hidden" name="token" value="{{ token }}">
+  <div class="btn-grid">
+    <button class="btn p lg" style="grid-column:span 2">✅ تأكيد الاستيراد الآن</button>
+    <a class="btn ghost lg" style="grid-column:span 2" href="{{ url_for('imports') }}">إلغاء</a>
+  </div>
+</form>
+<div class="hint">الأصناف المطابقة (بنفس الباركود أو الاسم) تُحدَّث ولا تتكرر. استيراد ديون CSV القديم مُعطّل، ولا تؤثر هذه القائمة في ديون الزبائن حتى تُنشئ عمليات بيع حقيقية.</div>
+{% endblock %}

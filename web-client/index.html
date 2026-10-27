@@ -1,0 +1,329 @@
+<!doctype html>
+<html dir="rtl" lang="ar">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover"/>
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; connect-src 'self' https://*.supabase.co wss://*.supabase.co; img-src 'self' data:; style-src 'self'; script-src 'self' 'wasm-unsafe-eval'; worker-src 'self' blob:; base-uri 'none'; form-action 'self'"/>
+<title>رفيق | إدارة المتجر</title>
+<link href="assets/brand/favicon.png" rel="icon"/>
+<link href="assets/style.css" rel="stylesheet"/>
+<link href="web.css" rel="stylesheet"/>
+  <link rel="stylesheet" href="model.css"/>
+<script src="assets/tesseract/tesseract.min.js"></script>
+<script type="module" src="web.js"></script>
+</head>
+<body>
+<header class="topbar no-print" role="banner">
+  <button id="menuToggle" class="icon-btn" type="button" aria-label="القائمة" aria-controls="tabs" aria-expanded="false">☰</button>
+  <div class="brand"><img alt="رفيق" src="assets/brand/logo_header_white.png"/></div>
+  <div class="t-title" id="viewTitle">الرئيسية</div>
+  <div class="topbar-meta"><span class="who" hidden id="who"></span><span class="online-dot" aria-label="حالة الاتصال" id="networkBadge"></span><div class="avatar" id="topAvatar">ر</div><button class="header-logout" hidden id="logout" type="button">خروج</button></div>
+</header>
+<div class="flash error hide" id="licenseBanner" role="status"></div>
+<div class="ribbon no-print">أرصدة مؤكدة من الخادم · عمليات دون نت بانتظار المزامنة</div>
+<div aria-live="polite" class="flash" hidden id="message" role="status"></div>
+<main class="wrap" id="main">
+  <section class="auth-shell" id="setupScreen">
+    <div class="card auth-card">
+      <img class="auth-logo" src="assets/brand/logo_full.png" alt="رفيق"/>
+      <h1 class="h1">ربط متجر رفيق</h1>
+      <p class="muted small">اربط هذا الهاتف بمشروع المتجر نفسه. استخدم رابط Supabase والمفتاح <b>العام فقط</b>، وليس مفتاح الخدمة أو كلمة مرور قاعدة البيانات. يحفظ أندرويد التهيئة العامة مشفرة على الجهاز.</p>
+      <form id="setupForm">
+        <label for="projectUrl">رابط مشروع المتجر</label><input autocomplete="off" dir="ltr" id="projectUrl" placeholder="https://project.supabase.co" required type="url"/>
+        <label for="publicKey">المفتاح العام (Publishable / Anon)</label><input autocomplete="off" dir="ltr" id="publicKey" required type="password"/>
+        <button class="btn p wide mt" type="submit">متابعة إلى الدخول</button>
+      </form>
+    </div>
+  </section>
+  <section class="auth-shell hide" id="activationScreen">
+    <div class="card auth-card login-card">
+      <div class="login-brand">
+        <img class="auth-logo" src="assets/brand/logo_full.png" alt="رفيق المحاسب"/>
+        <h1>تفعيل التطبيق</h1>
+      </div>
+      <p class="muted small">أدخل كود التفعيل الذي يمنحك إياه الموزّع — يعمل حتى بدون إنترنت.</p>
+      <div class="launch-device">
+        <div class="muted small">رمز جهازك — أعطِه للموزّع ليستخرج لك الكود</div>
+        <strong class="launch-device-code" id="launchDeviceCode">————</strong>
+      </div>
+      <form id="activationForm">
+        <label for="activationCode">كود التفعيل</label>
+        <input autocomplete="off" dir="ltr" id="activationCode" placeholder="RFQ-XXXX-XXXX" required spellcheck="false"/>
+        <button class="btn p wide mt" type="submit">تفعيل</button>
+      </form>
+      <p class="muted small" id="activationStatus" role="status"></p>
+    </div>
+  </section>
+  <section class="auth-shell hide" id="modeScreen"><div class="auth-topbar"><button class="auth-dots" type="button" aria-label="خيارات">⋯</button><div class="auth-hello">مرحبًا بعودتك</div></div>
+    <div class="card auth-card login-card">
+      <div class="login-brand">
+        <img id="modeBrandLogo" class="auth-logo" src="assets/brand/logo_full.png" alt="رفيق المحاسب"/>
+        <div class="hello">أهلًا بك</div>
+        <h1>رفيق المحاسب — نقطة البيع</h1>
+      </div>
+      <p class="muted small">اختر مرة واحدة — ويمكنك التغيير لاحقًا من الإعدادات.</p>
+      <button class="mode-card primary" id="modeOffline" type="button">
+        <div class="m-ico" style="background:var(--green-bg)">📱</div>
+        <div><div class="m-t">الدخول بدون إنترنت</div><div class="m-s">محل واحد على هذا الهاتف • اسم المحل ورقم سري • بلا إيميل</div></div>
+        <span class="m-tag">موصى به</span>
+      </button>
+      <button class="mode-card" id="modeOnline" type="button">
+        <div class="m-ico" style="background:#e8eef6">🌐</div>
+        <div><div class="m-t">الدخول بالإنترنت</div><div class="m-s">إيميل وكلمة سر • واتساب ورسائل • مزامنة أكثر من جهاز</div></div>
+      </button>
+    </div>
+  <div class="auth-foot"><span>الإصدار: 0.3.4</span></div></section>
+  <section class="auth-shell hide" id="localSetupScreen">
+    <div class="card auth-card login-card">
+      <div class="login-brand">
+        <img class="auth-logo" src="assets/brand/logo_full.png" alt="رفيق المحاسب"/>
+        <div class="hello">مرحبًا بك</div>
+        <h1>أنشئ حساب محلّك</h1>
+      </div>
+      <p class="muted small">مرة واحدة فقط — وبعدها تدخل برقمك السري مباشرة.</p>
+      <form id="localSetupForm">
+        <label for="localStoreName">اسم المحل</label>
+        <input id="localStoreName" maxlength="60" required/>
+        <label for="localPin">الرقم السري (4–6 أرقام)</label>
+        <input autocomplete="new-password" dir="ltr" id="localPin" inputmode="numeric" maxlength="6" minlength="4" pattern="[0-9]{4,6}" required type="password"/>
+        <label for="localPin2">تأكيد الرقم السري</label>
+        <input autocomplete="new-password" dir="ltr" id="localPin2" inputmode="numeric" maxlength="6" minlength="4" pattern="[0-9]{4,6}" required type="password"/>
+        <button class="btn p wide mt" type="submit">ابدأ العمل</button>
+      </form>
+    </div>
+  </section>
+  <section class="auth-shell hide" id="pinScreen">
+    <div class="card auth-card login-card">
+      <div class="login-brand">
+        <img class="auth-logo" src="assets/brand/logo_full.png" alt="رفيق المحاسب"/>
+        <div class="hello">مرحبًا بعودتك</div>
+        <h1>رفيق المحاسب — نقطة البيع</h1>
+      </div>
+      <p class="muted small" id="pinStoreName">وضع محلي — بدون إنترنت</p>
+      <form id="pinForm">
+        <label for="pinInput">الرقم السري</label>
+        <input autocomplete="current-password" dir="ltr" id="pinInput" inputmode="numeric" maxlength="6" required type="password"/>
+        <button class="btn p wide mt" type="submit">دخول</button>
+      </form>
+      <button class="btn ghost wide mt" id="pinChangeMode" type="button">تغيير وضع الدخول</button>
+    </div>
+  </section>
+  <section class="auth-shell hide" id="loginScreen"><div class="auth-topbar"><button class="auth-dots" type="button" aria-label="خيارات">⋯</button><div class="auth-hello">مرحبًا بعودتك</div></div>
+    <div class="login-brand">
+      <img id="brandLogo" class="auth-logo" src="assets/brand/logo_full.png" alt="رفيق المحاسب"/>
+      <div class="hello">مرحبًا بعودتك</div>
+      <h1>رفيق المحاسب — نقطة البيع</h1>
+    </div>
+    <div class="login-card">
+      <div class="seg" id="loginModeSeg">
+        <button data-mode="online" class="on" type="button">📶 الدخول بالإنترنت</button>
+        <button data-mode="offline" type="button">📴 الدخول بدون إنترنت</button>
+      </div>
+      <form id="loginForm">
+        <label class="field"><span>👤</span><input autocomplete="username" dir="ltr" id="email" placeholder="البريد الإلكتروني" required type="email"/></label>
+        <label class="field"><input autocomplete="current-password" id="password" placeholder="كلمة المرور" required type="password"/><button class="eye" id="passEye" type="button" aria-label="إظهار">👁</button></label>
+        <a class="forgot" href="javascript:void(0)" id="forgotLink">هل نسيت كلمة المرور؟</a>
+        <button class="login-main" type="submit">تسجيل الدخول</button>
+      </form>
+      <button class="login-alt" id="newAccountBtn" type="button">إنشاء حساب جديد</button>
+      <div style="text-align:center">
+        <button class="bio-btn" id="bioBtn" type="button" title="الدخول بالبصمة">🔐</button>
+        <div class="bio-caption">الدخول السريع بالبصمة</div>
+      </div>
+      <button class="btn amber wide mt hide" id="quickUnlockBtn" type="button">🔓 دخول سريع بالبصمة أو الرقم السري</button>
+      <div class="fold" id="setupFold"><button type="button"><div class="f-ico" style="background:#e8eef6">🛠</div><div class="f-t">إعداد الخادم والمتجر</div><div class="f-arrow">▾</div></button>
+        <div class="f-body"><div class="f-inner">
+          <button class="btn ghost wide mt" id="changeProject" type="button">تغيير تهيئة المتجر</button>
+          <button class="btn amber wide mt" id="modeSwitchLogin" type="button">🔁 تغيير الوضع (بالإنترنت / بدون إنترنت)</button>
+        </div></div>
+      </div>
+    </div>
+    <div class="login-foot">رفيق المحاسب · من دهفة للتقنية · الإصدار التجريبي 1.0</div>
+  <div class="auth-foot"><span>الإصدار: 0.3.4</span></div></section>
+  <section class="hide" id="appScreen">
+    <div id="drawerScrim" class="drawer-scrim hide" aria-hidden="true"></div>
+    <div class="app-layout">
+      <nav aria-label="أقسام رفيق" class="rafiq-drawer" id="tabs">
+        <div class="drawer-head drawer-brand">
+          <button id="menuClose" class="drawer-close" type="button" aria-label="أغلق القائمة">×</button>
+          <img class="drawer-store-photo hide" id="drawerStorePhoto" alt="صورة المتجر"/>
+          <div class="drawer-store">
+            <strong id="drawerStoreName">متجر رفيق</strong>
+            <div class="drawer-user-row"><img class="avatar sm hide" id="drawerUserPhoto" alt=""/><span class="drawer-user-name" id="drawerUserName">—</span></div>
+          </div>
+        </div>
+        <div class="drawer-group">المتجر</div>
+        <button class="owner-only" data-view="home" type="button"><span class="nav-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 11l8-7 8 7"/><path d="M6 9.5V20h12V9.5"/></svg></span>لوحة صاحب المتجر</button>
+        <button class="owner-only" data-view="monitor" type="button"><span class="nav-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 13h4l2.5-6 4 11L16 13h5"/></svg></span>متابعة المتجر</button>
+        <button class="owner-only" id="ownerSellerNav" data-nav-action="owner-sale" type="button"><span class="nav-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 4h2l2.3 11h10.6l1.9-8H7"/><circle cx="10" cy="20" r="1.3"/><circle cx="17" cy="20" r="1.3"/></svg></span>بيع المالك</button>
+        <button class="worker-only" data-view="pos" type="button"><span class="nav-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 4h2l2.3 11h10.6l1.9-8H7"/><circle cx="10" cy="20" r="1.3"/><circle cx="17" cy="20" r="1.3"/></svg></span>شاشة البيع</button>
+        <button data-view="customers" type="button"><span class="nav-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="9" cy="8" r="3.2"/><path d="M3.5 20c.6-3.2 2.8-5 5.5-5s4.9 1.8 5.5 5"/><path d="M15.5 5.2a3.2 3.2 0 0 1 0 5.7M17.6 15.3c1.6.8 2.6 2.3 2.9 4.7"/></svg></span>الزبائن والديون</button>
+        <button data-view="suppliers" type="button"><span class="nav-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 7h11v9H3z"/><path d="M14 10h3.6L21 13.4V16h-7"/><circle cx="7" cy="18" r="1.6"/><circle cx="17" cy="18" r="1.6"/></svg></span>الموردون والمشتريات</button>
+        <button data-view="products" type="button"><span class="nav-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3l8 4v10l-8 4-8-4V7z"/><path d="M4 7l8 4 8-4"/><path d="M12 11v10"/></svg></span>الأصناف والمخزون</button>
+        <button data-view="shifts" type="button"><span class="nav-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="8.5"/><path d="M12 7v5l3.5 2"/></svg></span>الصندوق والورديات</button>
+        <div class="drawer-group owner-only">الإدارة</div>
+        <button id="demandNav" type="button"><span class="nav-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 6h12M8 12h12M8 18h12"/><circle cx="4" cy="6" r="1"/><circle cx="4" cy="12" r="1"/><circle cx="4" cy="18" r="1"/></svg></span>الاحتياجات</button>
+        <button id="ocrNav" type="button"><span class="nav-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="5" width="18" height="14" rx="2"/><circle cx="12" cy="12" r="3.2"/></svg></span>قراءة الفواتير (OCR)</button>
+        <button class="owner-only" data-view="reports" type="button"><span class="nav-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 4v15.5h16"/><path d="M8.5 16v-4.5M12.5 16V8M16.5 16v-6.5"/></svg></span>التقارير والتصدير</button>
+        <button data-view="settings" type="button"><span class="nav-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="3.1"/><path d="M12 3v2.6M12 18.4V21M3 12h2.6M18.4 12H21M5.6 5.6l1.9 1.9M16.5 16.5l1.9 1.9M18.4 5.6l-1.9 1.9M7.5 16.5l-1.9 1.9"/></svg></span>الإعدادات والجهاز</button>
+        <div class="drawer-foot">
+          <img class="drawer-logo" src="assets/brand/logo_full.png" alt="رفيق المحل"/>
+          <strong class="drawer-app-name">رفيق المحل</strong>
+          <small class="drawer-copy">جميع الحقوق محفوظة لمنصة دهفة للتقنية</small>
+        </div>
+      </nav>
+      <div class="workspace"><div id="deviceNotice" class="device-notice" hidden></div><div id="workspaceStatus" class="workspace-status" hidden></div>
+        <div class="row page-heading"><div><span class="eyebrow">مساحة رفيق <span class="revision-badge">واجهة 130</span></span><h1 class="h1" id="pageTitle">لوحة صاحب المتجر</h1><div class="muted small" id="storeLine">بيانات المتجر والخادم</div></div><button class="btn sm ghost" id="reload" type="button"><span class="refresh-ico">↻</span> تحديث</button></div>
+        <div class="view" id="homeView"></div>
+        <div class="view hide owner-only" id="monitorView"></div>
+        <div class="view hide" id="posView">
+          <div class="sale-screen no-print">
+            <div class="sale-top">
+              <input id="saleSearch" class="sale-search" placeholder="ابحث بالاسم أو الباركود…" autocomplete="off"/>
+              <button id="saleScanBtn" class="scan-btn" type="button" aria-label="باركود">📷</button>
+            </div>
+            <div class="chip-row" id="saleCatsBar"></div>
+            <div class="sale-grid" id="saleGrid"></div>
+            <p class="muted small">اضغط الصنف لإضافته للسلة — ثم «مراجعة ودفع».</p>
+          </div>
+          <div class="sale-sticky no-print">
+            <button id="postSaleSticky" class="cart-fab-btn" type="button" aria-label="السلة">🛍<span class="count" id="cartCount">0</span></button>
+            <div class="sale-sticky-total hide"><small id="saleFabLabel">السلة</small><strong id="saleStickyTotal">٠ ريال</strong></div>
+          </div>
+          <div class="card hide" id="ownerSellerBar"><h2 class="h2">🛒 بيع المالك — بهويتك أنت</h2><p class="muted small" id="ownerSellerState"></p><div id="ownerSellerOpen"></div><button class="btn ghost wide mt" id="exitSellerMode" type="button">إنهاء وضع بيع المالك (ورديتك تبقى مفتوحة في الصندوق)</button></div>
+          <div class="grid g2">
+            <div class="card"><h2 class="h2">البيع النقدي والآجل</h2><p class="muted small">ابحث عن صنف أو امسح باركوده. يُحفظ الطلب على الهاتف أولاً، ولا يصبح مؤكداً إلا بإقرار الخادم.</p>
+              <div class="scanbar no-print"><label for="productSearch">بحث بالاسم أو الباركود</label><div class="scanbar-box"><input aria-controls="productMatches" autocomplete="off" class="big" id="productSearch" placeholder="اسم الصنف أو الباركود…" type="search"/><button aria-label="مسح باركود بالكاميرا" class="btn ghost" id="scanBarcode" type="button">📷 مسح</button></div><div aria-label="الأصناف المطابقة" class="suggest hide" id="productMatches" role="listbox"></div><button class="btn sm ghost mt" id="openProductList" type="button">افتح قائمة الأصناف</button><button class="btn sm mt" id="voiceAdd" type="button">🎤 أمر صوتي: أضف صنفًا</button></div>
+              <p class="flash error hide" id="posGate" role="status"></p>
+              
+            </div>
+            <div class="card"><h2 class="h2">نتيجة آخر حفظ للفاتورة</h2><div class="muted" id="latestInvoice">لا يوجد بيع مؤكد في هذه الجلسة.</div><button class="btn ghost wide mt" hidden id="printInvoice" type="button">طباعة الفاتورة</button><button class="btn amber wide mt" hidden id="returnLatestBtn" type="button">↩ مرتجع بيع لآخر فاتورة</button></div>
+          </div>
+          <div class="review-sheet hide" id="saleReview">
+            <div class="rs-panel">
+              <div class="rs-head"><h3>🧾 مراجعة الفاتورة</h3><button id="saleReviewClose" class="close-x" type="button" aria-label="إغلاق">✕</button></div>
+              <div class="rs-lines" id="reviewLines"></div>
+              <div class="seg rs-mode" id="paySeg">
+                <button id="modeCash" class="rs-mode-btn on gold" type="button">💵 نقدًا</button>
+                <button id="modeCredit" class="rs-mode-btn" type="button">📅 آجلًا (دين)</button>
+              </div>
+              <form id="saleForm">
+                <div class="rs-field hide" id="rsCustomerWrap">
+                  <label for="saleCustomer">الزبون (للآجل)</label>
+                  <select id="saleCustomer"></select>
+                </div>
+                <div class="rs-field">
+                  <label for="cashPaid">المدفوع نقدًا — ريال يمني</label>
+                  <input id="cashPaid" min="0" required step="0.01" type="number" value="0"/>
+                </div>
+                <details class="rs-more"><summary>محفظة/حوالة وخيارات أخرى</summary>
+                  <div class="grid g2">
+                    <div><label for="otherPaid">مدفوع بمحفظة/حوالة — ريال</label><input id="otherPaid" min="0" step="0.01" type="number" value="0"/></div>
+                    <div><label for="otherMethod">طريقة الدفع الأخرى</label><select id="otherMethod"><option value="wallet">محفظة إلكترونية</option><option value="transfer">حوالة</option></select></div>
+                  </div>
+                  <label for="otherReference">مرجع الحوالة/المحفظة (اختياري)</label>
+                  <input id="otherReference" maxlength="120"/>
+                </details>
+                <div class="stat mt" id="saleTotals">الإجمالي: ٠ ريال</div>
+                <button class="big-btn" id="postSale" type="submit">تأكيد البيع</button>
+                <button class="big-btn" style="background:var(--bg);color:var(--navy);margin-top:8px" id="cancelSale" type="button">إلغاء</button>
+                <button class="btn amber wide mt hide" id="retryPending" type="button">أعد نفس العملية المعلّقة</button>
+              </form>
+            </div>
+          </div>
+          <div class="hide">
+            <select id="saleProduct"></select>
+            <input id="saleQty" max="1000" min="0.001" step="0.001" type="number" value="1"/>
+            <button id="addItem" type="button">أضف</button>
+            <div id="cart"></div>
+          </div>
+        </div>
+        <div class="view hide" id="customersView">
+          <div class="section-intro"><h2>الزبائن والديون</h2><p>حسابات المتجر نفسه. اضغط «عرض الدين» لقراءة الرصيد المؤكد من الخادم.</p></div>
+          <div class="chip-row debt-top-filters" id="customerFilterChips"><button class="chip on" data-cfilter="all" type="button">الكل</button><button class="chip" data-cfilter="follow" type="button">تحتاج متابعة</button><button class="chip" data-cfilter="clear" type="button">بلا دين</button></div><div class="grid g2"><div class="card action-card" id="newCustomerCard"><h2 class="h2">إضافة زبون</h2><form id="customerForm"><label for="customerName">اسم الزبون</label><input id="customerName" maxlength="120" required/><label for="customerPhone">الهاتف (اختياري)</label><input dir="ltr" id="customerPhone" maxlength="30" type="tel"/><button class="btn ghost sm" id="pickCustomerContact" type="button">📇 اختر رقمًا من الهاتف</button><p class="muted small">تفعيل رسائل كل زبون من زر «الرسائل» في قائمته بالأسفل، بعد أخذ موافقته.</p><button class="btn p wide mt">حفظ الزبون</button></form></div>
+          <div class="card worker-only"><h2 class="h2">تحصيل دين</h2><p class="muted small">للعامل بعد اعتماد الجهاز وفتح الوردية فقط.</p><form id="collectionForm"><label for="collectionCustomer">الزبون</label><select id="collectionCustomer" required></select><label for="collectionAmount">المبلغ بالريال اليمني</label><input id="collectionAmount" min="0.01" required step="0.01" type="number"/><label for="collectionMethod">طريقة التحصيل</label><select id="collectionMethod"><option value="cash">نقد في الدرج</option><option value="wallet">محفظة إلكترونية</option><option value="transfer">حوالة</option></select><label for="collectionReference">مرجع الحوالة/المحفظة (اختياري)</label><input id="collectionReference" maxlength="120"/><button class="btn p wide mt" id="collectButton">تأكيد التحصيل</button><button class="btn amber wide mt hide" id="retryCollection" type="button">أعد نفس التحصيل المعلّق</button></form></div></div>
+          <div class="card"><h2 class="h2">زبائن المتجر</h2><div aria-live="polite" class="balance-panel hide" id="customerBalancePanel" role="status"></div><div id="customerList"></div></div>
+          <div class="card mt hide no-print" id="statementPanel"></div>
+          <div class="card owner-only"><h2 class="h2">إضافة دين — المالك</h2><p class="muted small">قيد دين خادمي بسبب مكتوب، وليس نقداً في الصندوق.</p><form id="ownerDebtForm"><label for="debtCustomer">الزبون</label><select id="debtCustomer" required></select><label for="debtAmount">المبلغ بالريال اليمني</label><input id="debtAmount" min="0.01" required step="0.01" type="number"/><label for="debtReason">السبب</label><input id="debtReason" maxlength="200" minlength="3" required/><button class="btn p wide mt" id="ownerDebtButton">تسجيل الدين</button><button class="btn amber wide mt hide" id="retryOwnerDebt" type="button">أعد نفس الدين المعلّق</button></form></div>
+        </div>
+        <div class="view hide" id="productsView">
+          <div class="section-intro"><h2>الأصناف والمخزون</h2><p>ابحث، أضف صنفاً، أو سجّل التزويد والتصحيح بسبب واضح. لا يتغير رصيد الخادم بصمت.</p></div>
+          <div class="card owner-only action-card" id="newProductCard"><h2 class="h2">إضافة صنف جديد</h2><form id="productForm"><label for="productName">اسم الصنف</label><input id="productName" maxlength="120" required/><label for="productBarcode">الباركود (اختياري)</label><input dir="ltr" id="productBarcode" maxlength="80"/><button class="btn ghost sm" id="scanProductBarcode" type="button">📷 مسح الباركود بالكاميرا</button><div class="grid g2"><div><label for="productPrice">سعر البيع بالريال</label><input id="productPrice" min="0" required step="0.01" type="number"/></div><div><label for="productCost">تكلفة الصنف بالريال</label><input id="productCost" min="0" required step="0.01" type="number"/></div></div><label for="productStock">رصيد افتتاحي</label><input id="productStock" min="0" required step="0.001" type="number" value="0"/><div class="grid g2"><div><label for="productExpiry">تاريخ الصلاحية (اختياري)</label><input id="productExpiry" dir="ltr" type="date"/></div><div><label for="productUnit2">الوحدة</label><select id="productUnit2"><option value="piece">حبة/قطعة</option><option value="carton">كرتون</option><option value="kg">كيلوغرام</option><option value="gram">غرام</option><option value="liter">لتر</option><option value="pack">شدّة/رزمة</option></select></div></div><label for="productCategory">النوع / التصنيف (اختياري)</label><input id="productCategory" list="categoryList" maxlength="60" placeholder="مثال: مشروبات، مواد غذائية، منظفات، ألبان"/><datalist id="categoryList"></datalist><p class="muted small">الرصيد الافتتاحي حركة مخزون موثقة مرة واحدة، حتى عند إعادة المحاولة.</p><button class="btn p wide mt">حفظ الصنف</button></form></div>
+          <div class="card"><h2 class="h2">قائمة الأصناف</h2><p class="muted small">دون إنترنت تظهر آخر مرآة على الهاتف، والتغييرات الجديدة «بانتظار المزامنة».</p><label for="catalogSearch">ابحث عن صنف أو باركود</label><input autocomplete="off" id="catalogSearch" placeholder="اسم الصنف أو الباركود" type="search"/><div class="muted small mt" id="catalogStatus" role="status"></div>
+<div class="chip-row" id="catalogFilterChips"><button class="chip on" data-ifilter="all" type="button">الكل</button><button class="chip" data-ifilter="low" type="button">⚠ قارب النفاد</button><button class="chip" data-ifilter="exp" type="button">⏳ صلاحية قريبة</button></div><button class="btn sm ghost mt" id="printAllLabels" type="button">🏷 طباعة ملصقات كل الأصناف (التي لها باركود)</button><div class="ledger mt" id="catalogList"></div></div>
+          <div class="card" id="demandCard"><h2 class="h2">📝 طلبات واحتياجات المتجر</h2><p class="muted small">بضاعة يطلبها الزبائن أو يحتاجها المتجر وغير متوفرة الآن — سجّلها هنا ليتابعها المالك والعامل حتى تُوفَّر من الموردين.</p><form id="demandForm"><label for="demandProduct">صنف موجود (اختياري)</label><select id="demandProduct"></select><label for="demandName">أو اسم بضاعة جديدة</label><input id="demandName" maxlength="160" placeholder="مثال: سكر ٥ كيلو"/><div class="grid g2"><div><label for="demandQty">الكمية المطلوبة (اختياري)</label><input id="demandQty" min="0" step="0.001" type="number"/></div><div><label for="demandNote">ملاحظة (اختياري)</label><input id="demandNote" maxlength="300" placeholder="مثال: يطلبه الزبائن يوميًا"/></div></div><button class="btn p wide mt">تسجيل طلب الاحتياج</button></form><div id="demandList" class="mt"></div></div>
+          <div class="card owner-only" id="stocktakeCard"><h2 class="h2">🧮 الجرد الدوري — عدّ فعلي ومطابقة</h2><p class="muted small">ابدأ الجرد وعدّ كل صنف فعليًا في المحل، ثم اعتمده: تُسوّى الفروق بحركات مخزون موثّقة بالسبب — لا تعديل صامت أبدًا.</p><button class="btn p wide" id="startStocktake" type="button">بدء جرد جديد</button><div id="stocktakeBody" class="mt"></div></div>
+          <div class="card owner-only"><h2 class="h2">تزويد أو تصحيح المخزون</h2><p class="muted small">سجّل السبب والكمية. الجرد النهائي يحتاج مطابقة قراءة الخادم أولاً؛ لا نسوّي الفروق تلقائياً.</p><form id="stockAdjustmentForm"><label for="adjustProduct">الصنف</label><select id="adjustProduct" required></select><label for="stockAction">العملية</label><select id="stockAction"><option value="receive">تزويد (+)</option><option value="loss">نقص / تصحيح (−)</option></select><label for="stockQty">الكمية</label><input id="stockQty" max="1000" min="0.001" required step="0.001" type="number"/><label for="stockReason">السبب</label><input id="stockReason" maxlength="200" minlength="3" placeholder="مثال: تزويد من المخزن" required/><button class="btn p wide mt" type="submit">حفظ حركة المخزون</button></form></div>
+        </div>
+        <div class="view hide" id="suppliersView">
+          <div class="section-intro"><h2>الموردون والمشتريات</h2><p>رصيد موجب = دين على المتجر للمورّد. الشراء من الوردية يخرج من الدرج بقيد موثّق، والباقي دين على المتجر في كشف المورّد.</p></div>
+          <div class="card owner-only action-card"><h2 class="h2">إضافة مورّد / شركة / موزّع</h2><form id="supplierForm"><label for="supName">الاسم</label><input id="supName" maxlength="120" required/><label for="supPhone">الهاتف (اختياري)</label><input dir="ltr" id="supPhone" maxlength="30" type="tel"/><button class="btn ghost sm" id="pickSupplierContact" type="button">📇 اختر رقمًا من الهاتف</button><label for="supKind">النوع</label><select id="supKind"><option value="supplier">مورّد</option><option value="company_rep">مندوب شركة</option><option value="daily_distributor">موزّع يومي متجول</option></select><label for="supPhoto">صورة/شعار (اختياري)</label><input accept="image/*" id="supPhoto" type="file"/><img alt="" class="avatar-preview hide" id="supPhotoPreview"/><label for="supNotes">ملاحظات</label><input id="supNotes" maxlength="200"/><button class="btn p wide mt">حفظ المورّد</button></form></div>
+          <div class="card" id="ocrDraftCard"><h2 class="h2">📷 قراءة فاتورة شراء</h2><p class="muted small">صوّر أصل الفاتورة أو اخترها من المعرض. كل ما يقرأه التطبيق اقتراح فقط — تراجع كل بند والصورة أمامك، ولا يُسجَّل شيء قبل موافقتك. الإدخال اليدوي يعمل دائمًا حتى لو فشلت القراءة.<br/><strong>أفضل قراءة:</strong> صورة جديدة من الكاميرا مباشرة — الورقة مفرودة، الضوء واضح، والكاميرا فوقها مباشرة.</p><div class="row wrap"><button class="btn p" id="ocrCaptureBtn" type="button">تصوير / اختيار صورة الفاتورة</button><input type="file" accept="image/*" capture="environment" id="ocrFile" class="hide"/><button class="btn ghost sm" id="ocrRunBtn" type="button" disabled>استخراج البنود من الصورة</button></div><div class="grid g2 mt" id="ocrReviewGrid"><div id="ocrImageWrap"><img id="ocrImagePreview" alt="صورة الفاتورة" class="hide" style="width:100%;border-radius:12px;border:1px solid var(--line)"/><p class="muted small" id="ocrImageMeta"></p><label for="ocrInvoiceRef">رقم فاتورة المورد</label><input id="ocrInvoiceRef" maxlength="100"/><label for="ocrInvoiceDate">تاريخ الفاتورة</label><input id="ocrInvoiceDate" type="date" dir="ltr"/><label for="ocrSupplier">المورّد</label><select id="ocrSupplier"></select><label for="ocrPayType">طريقة السداد</label><select id="ocrPayType"><option value="cash">نقدي — الفاتورة كاملة</option><option value="credit">آجل — مدفوع جزئي أو الآجل كامل</option></select><label for="ocrPayMethod">من أين الدفع</label><select id="ocrPayMethod"><option value="cash">نقد من الدرج</option><option value="wallet">محفظة إلكترونية</option><option value="transfer">حوالة</option></select><label for="ocrDeclaredTotal">إجمالي الفاتورة كما هو مطبوع — ريال</label><input id="ocrDeclaredTotal" type="number" min="0" step="0.01"/><label for="ocrPaid">المدفوع الآن — ريال</label><input id="ocrPaid" type="number" min="0" step="0.01" value="0"/><label><input checked id="ocrFromShift" type="checkbox"/> تسجيل الدفع من وردية مفتوحة (يظهر في الصندوق)</label></div><div><div class="muted small" id="ocrStatus" role="status">لا صورة محددة بعد.</div><div id="ocrLinesBox"></div><div class="muted small" id="ocrSumLine" aria-live="polite"></div><div class="row wrap mt"><button class="btn ghost sm" id="ocrAddRowBtn" type="button">+ سطر يدوي</button><button class="btn ghost sm" id="ocrMarkAllBtn" type="button">✓ أكدت كل البنود</button><button class="btn p" id="ocrPostBtn" type="button">ترحيل الفاتورة إلى المورّدين</button></div><div class="muted small" id="ocrRulesMsg" role="status"></div></div></div></div>
+        <div class="card"><h2 class="h2">فاتورة شراء جديدة</h2><form id="purchaseForm"><label for="purSupplier">المورّد</label><select id="purSupplier" required></select><div id="purchaseLines"></div><button class="btn ghost sm mt" id="addPurchaseLine" type="button">+ بند شراء</button><div class="grid g2"><div><label for="purPaid">المدفوع الآن — ريال</label><input id="purPaid" min="0" step="0.01" type="number" value="0"/></div><div><label for="purPayMethod">طريقة الدفع</label><select id="purPayMethod"><option value="cash">نقد من الدرج</option><option value="wallet">محفظة إلكترونية</option><option value="transfer">حوالة</option></select></div></div><label><input checked id="purFromShift" type="checkbox"/> تسجيل الدفع على ورديتي/الوردية المفتوحة (يظهر في الصندوق)</label><label for="purNote">ملاحظة</label><input id="purNote" maxlength="200"/><button class="btn p wide mt">حفظ فاتورة الشراء</button></form></div>
+          <div class="grid g2"><div class="card"><h2 class="h2">دفعة لمورّد</h2><form id="supplierPayForm"><label for="paySupplier">المورّد</label><select id="paySupplier" required></select><label for="payAmount">المبلغ — ريال</label><input id="payAmount" min="0.01" required step="0.01" type="number"/><label for="payMethod">الطريقة</label><select id="payMethod"><option value="cash">نقد من الدرج</option><option value="wallet">محفظة إلكترونية</option><option value="transfer">حوالة</option></select><label><input checked id="payFromShift" type="checkbox"/> تسجيلها على الوردية المفتوحة</label><label for="payNote">ملاحظة/مرجع</label><input id="payNote" maxlength="200"/><button class="btn p wide mt">حفظ الدفعة</button></form></div>
+          <div class="card"><h2 class="h2">مرتجع إلى مورّد</h2><p class="muted small">يُخفّض المخزون ودين المتجر للمورّد (تسوية من الدين، لا ردّ نقدي).</p><form id="supplierReturnForm"><label for="retSupplier">المورّد</label><select id="retSupplier" required></select><div id="returnLines"></div><button class="btn ghost sm mt" id="addReturnLine" type="button">+ بند مرتجع</button><label for="retNote">سبب المرتجع</label><input id="retNote" maxlength="200"/><button class="btn amber wide mt">حفظ المرتجع</button></form></div></div>
+          <div class="card"><h2 class="h2">الموردون وأرصدتهم</h2><div id="supplierList"></div></div>
+          <div class="card hide" id="workerSupplierRequest"><h2 class="h2">＋ مورد بطلب</h2><p class="muted small">أرسل طلب إضافة مورد للمالك — يوافق أو يرفض، مثل الوردية.</p><form id="wsrForm"><label for="wsrName">اسم المورد</label><input id="wsrName" maxlength="120" required/><label for="wsrKind">النوع</label><select id="wsrKind"><option value="supplier">مورّد</option><option value="company_rep">مندوب شركة</option><option value="distributor">موزّع</option></select><label for="wsrDesc">الوصف</label><input id="wsrDesc" maxlength="300" placeholder="مثال: موزّع مواد غذائية — يزورنا أيام الأحد"/><label for="wsrPhone">الهاتف (اختياري)</label><input dir="ltr" id="wsrPhone" maxlength="30" type="tel"/><button class="btn p wide mt">إرسال الطلب للمالك</button></form></div>
+          <div class="card" id="supplierRequests"></div>
+          <div class="card hide" id="supplierStatementCard"><h2 class="h2" id="supplierStatementTitle">كشف مورّد</h2><div id="supplierStatement"></div><button class="btn ghost wide mt" id="printSupplierStatement" type="button">🖨 طباعة الكشف</button></div>
+        </div>
+        <div class="view hide" id="shiftsView"><div class="section-intro"><h2>الصندوق والورديات</h2><p>المالك يعتمد الوردية، والعامل يرى حالتها وعملياته وفق صلاحياته.</p></div><div class="card"><h2 class="h2">حالة الوردية والطلبات</h2><div id="shiftList"></div></div><div class="card owner-only"><h2 class="h2">حركة الصندوق — المالك</h2><form id="ownerCashForm"><label for="cashShift">الوردية</label><select id="cashShift" required></select><label for="cashKind">النوع</label><select id="cashKind"><option value="expense">مصروف</option><option value="withdraw">سحب مالك</option><option value="income">دخل</option></select><label for="cashAmount">المبلغ بالريال</label><input id="cashAmount" min="0.01" required step="0.01" type="number"/><label for="cashReason">السبب</label><input id="cashReason" maxlength="200" minlength="3" required/><button class="btn p wide mt" id="ownerCashButton">حفظ حركة الصندوق</button><button class="btn amber wide mt hide" id="retryOwnerCash" type="button">أعد نفس حركة الصندوق المعلّقة</button></form></div></div>
+        <div class="view hide owner-only" id="reportsView"><div class="section-intro"><h2>التقارير والتصدير</h2><p>مؤشرات المتجر من الخادم، لا تشمل المشتريات والمرتجعات المؤجلة.</p></div><div class="chip-row report-top-filters" id="reportFilterChips" aria-label="تصفية التقارير"><button class="chip on" data-rfilter="all" type="button">الكل</button><button class="chip" data-rfilter="sales" type="button">المبيعات</button><button class="chip" data-rfilter="stock" type="button">المخزون</button><button class="chip" data-rfilter="debts" type="button">الديون</button><button class="chip" data-rfilter="purchases" type="button">المشتريات</button></div><div class="grid g4" id="reportCards"></div><div class="card mt hide" id="salesReturnCard"></div>
+<div class="card mt" id="expiringCard" data-report-group="stock"><h2 class="h2">🟡 دفعات تقارب الانتهاء أو منتهية (30 يومًا)</h2><div id="expiringTable"></div><p class="muted small">الكمية المنتهية غير صالحة للبيع — يرفض النظام صرفها من المخزون.</p></div>
+<div class="card mt" data-report-group="sales"><h2 class="h2">💰 تقرير الربح الدقيق</h2><p class="muted small">الربح = صافي المبيعات بعد المرتجعات − تكلفة البضاعة بسعر شرائها وقت البيع.</p><div class="grid g2"><div><label for="profitFrom">من تاريخ</label><input id="profitFrom" dir="ltr" type="date"/></div><div><label for="profitTo">إلى تاريخ</label><input id="profitTo" dir="ltr" type="date"/></div></div><button class="btn p wide mt" id="loadProfit" type="button">عرض الربح الدقيق</button><div class="mt" id="profitResult"></div><button class="btn ghost wide mt hide" id="printProfit" type="button">🖨 طباعة / حفظ PDF</button></div>
+<div class="card mt"><h2 class="h2">📄 تقارير شاملة — طباعة / PDF</h2><p class="muted small">تُبنى التقارير من بيانات الخادم، ومن نافذة الطباعة اختر «حفظ كـ PDF» للحصول على نسخة بشعار متجرك.</p><label for="reportDate">تاريخ التقارير اليومية</label><input id="reportDate" dir="ltr" type="date"/><div class="row wrap mt"><button class="btn sm" data-report-group="sales" id="repDailySales" type="button">📈 مبيعات اليوم</button><button class="btn sm" data-report-group="purchases" id="repDailyPurchases" type="button">📦 توريدات اليوم</button><button class="btn sm" data-report-group="stock" id="repInventory" type="button">🧺 تقرير المخزون</button><button class="btn sm" data-report-group="debts" id="repCustomers" type="button">👥 تقرير الزبائن الشامل</button><button class="btn sm" data-report-group="purchases" id="repSuppliers" type="button">🚚 تقرير الموردين الشامل</button></div><label for="reportCustomer">كشف زبون تفصيلي</label><select id="reportCustomer"></select><button class="btn ghost wide mt" id="repCustomerStmt" type="button">🖨 طباعة كشف الزبون التفصيلي</button></div><div class="card mt" data-report-group="sales"><h2 class="h2">آخر الفواتير المؤكدة</h2><div id="invoiceList"></div></div><div class="card mt" data-report-group="debts"><h2 class="h2">تحصيلات أخيرة — عكس موثّق (مالك)</h2><div id="collectionList"></div></div><div class="card mt"><h2 class="h2">نسخ السجلات</h2><p class="muted small">عند انتهاء الاشتراك تبقى القراءة والتصدير متاحين، ولا يُحذف شيء.</p><div class="row wrap"><button class="btn sm" id="exportInvoices" type="button">الفواتير CSV</button><button class="btn sm" id="exportCustomers" type="button">الزبائن CSV</button><button class="btn sm" id="exportDebts" type="button">الديون CSV</button><button class="btn sm ghost hide" id="openArchive" type="button">أرشيف قديم</button></div></div></div>
+        <div class="view hide" id="settingsView"><div class="section-intro"><h2>الإعدادات والجهاز</h2></div><div class="card"><h2 class="h2">الحساب والمتجر</h2><div class="muted" id="accountDetails"></div><div class="row mt"><span>مظهر التطبيق</span><button class="btn sm ghost" id="themeToggle" type="button">🌙 الوضع الليلي</button></div></div><div class="card"><h2 class="h2">التفعيل ووضع الدخول</h2><div class="muted" id="launchInfo"></div><div class="row wrap mt"><button class="btn sm ghost" id="launchRenewBtn" type="button">تجديد التفعيل بكود جديد</button><button class="btn sm ghost" id="launchModeBtn" type="button">تغيير وضع الدخول</button></div><p class="muted small" id="launchDeviceLine"></p></div><div class="card owner-only" id="storeProfileCard"><h2 class="h2">تهيئة المتجر</h2><p class="muted small">تظهر هذه البيانات والشعار في الفواتير والكشوف المطبوعة.</p><label for="storeDisplayName">اسم المتجر للطباعة</label><input id="storeDisplayName" maxlength="120"/><label for="storeProfilePhone">هاتف المتجر</label><input dir="ltr" id="storeProfilePhone" maxlength="30" type="tel"/><label for="storeAddress">العنوان</label><input id="storeAddress" maxlength="200"/><label for="storeFooter">تذييل الفاتورة</label><input id="storeFooter" maxlength="200" placeholder="شكرًا لزيارتكم"/><label for="storeLogoFile">شعار المتجر (اختياري)</label><input accept="image/*" id="storeLogoFile" type="file"/><img alt="" class="avatar-preview hide" id="storeLogoPreview"/><p class="muted small" id="storeProfileMsg" role="status"></p><button class="btn p wide mt" id="saveStoreProfile" type="button">حفظ تهيئة المتجر</button></div>
+<div class="card"><h2 class="h2">👤 ملفي</h2><p class="muted small">اسمك وصورتك يظهران في القائمة الجانبية وفواتيرك.</p><div class="row wrap"><img class="avatar hide" id="myPhotoPreview" alt="صورتي"/><button class="btn sm ghost" id="myPhotoPick" type="button">📷 اختر صورتي</button><input class="hide" id="myPhotoFile" accept="image/*" type="file"/></div><label for="myDisplayName">الاسم الظاهر</label><input id="myDisplayName" maxlength="60" placeholder="مثال: صادق الطاهري"/><button class="btn p wide mt" id="saveMyProfile" type="button">حفظ ملفي</button></div>
+<div class="card owner-only"><h2 class="h2">👥 صلاحيات العاملين</h2><p class="muted small">فعّل «إضافة الموردين» لمن تشاء وأوقفها متى شاء — العامل يرسل طلبًا وأنت توافق.</p><div id="memberPermsList"></div></div>
+<div class="card"><h2 class="h2">🔒 قفل التطبيق</h2><p class="muted small">الدخول السريع بالبصمة أو رقم سري — يقفل هذا الهاتف فقط، وكلمة المرور تبقى هي الأصل.</p><label><input id="lockBiometric" type="checkbox"/> الدخول بالبصمة</label><p class="muted small" id="bioNote"></p><label><input id="lockPin" type="checkbox"/> الدخول برقم سري (PIN)</label><div class="row wrap"><button class="btn sm p" id="setPinBtn" type="button">تعيين الرقم السري</button><button class="btn sm ghost" id="clearLockBtn" type="button">إيقاف القفل</button></div></div>
+<div class="card" id="devicePanel"><div class="device-management" id="ownerDevices"></div></div><div class="card owner-only" id="messageSettingsCard"><h2 class="h2">إعدادات الرسائل والمتابعة</h2>
+<p class="muted small">رقم SMS (شريحة جهاز الإرسال) منفصل تمامًا عن رقم واتساب المتجر. الإيقاف على أي مستوى يوقف إرساله فورًا. واتساب يُجهَّز هنا ويُفعَّل إرساله بعد ربط Meta برقم المتجر.</p>
+<label><input id="msgMaster" type="checkbox"/> تفعيل كل الرسائل</label>
+<label><input id="msgWhatsappOn" type="checkbox"/> قناة واتساب</label>
+<label for="msgWaInvoiceMode">طريقة إرسال الفاتورة بالواتساب</label><select id="msgWaInvoiceMode"><option value="pdf">ملف PDF + نص (الموصى به — كما كانت)</option><option value="text">نص + رابط معاينة الفاتورة</option></select>
+<label><input id="msgSmsOn" type="checkbox"/> قناة SMS من الشريحة</label>
+<label for="msgWhatsappPhone">رقم واتساب المتجر</label><input dir="ltr" id="msgWhatsappPhone" type="tel"/>
+<label for="msgOwnerPhone">رقم تنبيهات المالك</label><input dir="ltr" id="msgOwnerPhone" type="tel"/>
+<p class="muted small" id="msgSmsDeviceState">جهاز إرسال SMS: غير معيّن</p>
+<button class="btn ghost wide" id="setSmsDevice" type="button">عيّن هذا الجهاز مرسل SMS</button>
+<label><input id="msgEvtCredit" type="checkbox"/> عند البيع الآجل</label>
+<label><input id="msgEvtCollection" type="checkbox"/> عند التحصيل</label>
+<label><input id="msgEvtReminder" type="checkbox"/> تذكير بالدين</label>
+<label><input id="msgEvtOwner" type="checkbox"/> تنبيهات للمالك (ديون/مخزون/ورديات)</label>
+<label><input id="msgReminderOn" type="checkbox"/> تذكير دوري للزبائن بالتسديد</label>
+<label for="msgReminderMin">الحد الأدنى لرصيد التذكير (ريال)</label><input id="msgReminderMin" min="0" step="0.01" type="number" value="1000"/><div class="grid g2"><div><label for="msgQuietStart">ساعات الهدوء من (ساعة)</label><input id="msgQuietStart" max="23" min="0" type="number" value="21"/></div><div><label for="msgQuietEnd">إلى (ساعة)</label><input id="msgQuietEnd" max="23" min="0" type="number" value="7"/></div></div>
+<h3 class="h2">نصوص الرسائل — قوالب قابلة للتحرير</h3><p class="muted small">اكتب بحرّيتك حتى ٣٢٠ حرفًا — والرسالة القصيرة أجمل وتصل أسرع (مقطع SMS عربي واحد ≈ ٧٠ حرفًا، ثم ٦٧ لكل مقطع إضافي). الرموز المتاحة: {store} اسم المتجر، {amount} المبلغ، {balance} الرصيد المستحق. فرّغ الحقل لاستعمال النص الافتراضي.</p><label for="tplCreditSale">رسالة البيع الآجل</label><textarea id="tplCreditSale" maxlength="320" rows="2"></textarea><label for="tplCollection">رسالة التحصيل</label><textarea id="tplCollection" maxlength="320" rows="2"></textarea><label for="tplReminder">رسالة التذكير</label><textarea id="tplReminder" maxlength="320" rows="2"></textarea><label for="tplOwnerAlert">تنبيه المالك</label><textarea id="tplOwnerAlert" maxlength="320" rows="2"></textarea>
+<label for="msgFooter">تذييل موسمي / معايدة (اختياري)</label><input id="msgFooter" maxlength="80" placeholder="يظهر في ذيل رسائل الزبائن — مثال: عيدكم مبارك"/><div class="row wrap"><button class="btn sm ghost" data-footer-preset="عيدكم مبارك، وكل عام وأنتم بخير" type="button">عيد الفطر/الأضحى</button><button class="btn sm ghost" data-footer-preset="رمضان كريم، تقبل الله صيامكم" type="button">رمضان</button><button class="btn sm ghost" data-footer-preset="جمعة مباركة" type="button">جمعة مباركة</button><button class="btn sm ghost" data-footer-preset="كل عام وأنتم بخير" type="button">عام جديد</button></div><p class="muted small" id="footerEstimate" role="status"></p>
+<button class="btn p wide mt" id="saveMsgSettings" type="button">حفظ إعدادات الرسائل</button>
+<button class="btn amber wide mt" id="sendReminders" type="button">ضع تذكيرات المستحقين الآن في قائمة الإرسال</button>
+<h3 class="h2">سجل الرسائل</h3><div id="msgLog"></div></div>
+<div class="card"><h2 class="h2">الأوامر الصوتية</h2><p class="muted small" id="voiceMyState">—</p><p class="muted small">الأمر الصوتي يضيف للسلة فقط؛ تأكيد البيع النقدي/الآجل يبقى بلمس زر الحفظ. الصوت وحده لا يخوّل عملية مالية.</p><div class="owner-only" id="voiceList"></div></div><div class="card" id="myMsgCard"><h2 class="h2">حالة رسائل المتجر الأخيرة</h2><p class="muted small">queued=بالانتظار، sending=تُرسل الآن، sent=أُرسلت، failed=فشلت (اضغط أي رسالة لقراءة نصها).</p><div id="myMsgLog"></div></div>
+<div class="card" id="userGuideCard"><h2 class="h2">📖 دليل الاستخدام السريع</h2><p><b>العامل:</b> اطلب وردية وانتظر اعتماد المالك، ثم بِع نقدًا أو آجلًا من شاشة البيع. التحصيل من «الزبائن والديون» باختيار طريقة الدفع (نقد/محفظة/حوالة). عند شراء بضاعة من موزّع متجول سجّل فاتورة شراء من «الموردون» وادفع من درجك؛ الباقي دين على المتجر تلقائيًا. أي بيع دون نت يُحفظ «مستندًا مؤقتًا» ويُرفع عند عودة الاتصال.</p><p><b>المالك:</b> اعتمد الأجهزة والورديات من اللوحة، وراقب التنبيهات والديون، وعطّل/فعّل الرسائل وقوالبها من الإعدادات، واعكس أي تحصيل أو ألغِ أي فاتورة بسبب مكتوب — لا يُحذف أي مستند أبدًا. أغلق الوردية بجرد النقد الفعلي؛ النظام يقارنه بالمفروض في الدرج (النقد فقط، المحافظ والحوالات منفصلة).</p><p><b>المرتجعات:</b> مرتجع بيع من تفاصيل الفاتورة بردّ من الدين أو نقدًا أو محفظة، ومرتجع للمورّد من شاشة الموردين — دائمًا بسبب موثّق.</p></div>
+<div class="card"><h2 class="h2">رفيق · واجهة 130</h2><p>رفيق — المالك والعامل في التطبيق نفسه، على متجر وخادم واحد.</p><p class="muted small">لا تُرحّل البيانات التجريبية القديمة صامتاً. أي مستند دون نت يبقى مؤقتاً حتى إقرار الخادم. رسائل SMS من شريحة المتجر تُدار من الإعدادات، وواتساب يُفعَّل بعد ربط Meta.</p></div></div>
+      </div>
+    </div>
+    <button id="bottomMore" class="hide" type="button" aria-hidden="true" tabindex="-1">المزيد</button>
+    <nav class="bottom-nav no-print" id="bottomNav" aria-label="تنقل رفيق السريع">
+      <button data-view="home" type="button"><span class="t-ico">🏠</span>الرئيسية</button>
+      <button id="tabSale" type="button"><span class="t-ico">🛒</span>البيع</button>
+      <button data-view="customers" type="button"><span class="t-ico">🤝</span>الديون</button>
+      <button data-view="shifts" type="button"><span class="t-ico">💰</span>الصندوق</button>
+      <button data-view="products" type="button"><span class="t-ico">📦</span>الأصناف</button>
+    </nav>
+  </section>
+</main>
+<div aria-hidden="true" id="printArea"></div>
+<script src="camera.js"></script>
+<script src="thermal.js"></script>
+<script src="bulkedit.js"></script>
+<script src="home.js"></script>
+<script src="pos.js"></script>
+<script src="sorting.js"></script>
+<script src="dupcheck.js"></script>
+<script src="sms-offline.js"></script>
+<script src="sms-sale.js"></script>
+<script src="assets/vendor/fflate.js"></script>
+<script src="xlsx.js"></script>
+<script src="product-import.js"></script>
+</body>
+</html>

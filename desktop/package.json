@@ -1,0 +1,54 @@
+{
+  "name": "rafiq-pos-desktop",
+  "productName": "Rafiq POS",
+  "version": "0.3.4",
+  "description": "رفيق المحاسب — نظام نقاط البيع والمحاسبة (من دهفة للتقنية)",
+  "main": "main.js",
+  "author": "Dahfa for Technology",
+  "license": "UNLICENSED",
+  "scripts": {
+    "start": "electron .",
+    "dist": "electron-builder --win nsis portable"
+  },
+  "devDependencies": {
+    "electron": "^31.7.7",
+    "electron-builder": "^24.13.3"
+  },
+  "build": {
+    "appId": "com.dahfa.rafiqpos",
+    "productName": "Rafiq POS",
+    "directories": {
+      "output": "dist",
+      "buildResources": "resources"
+    },
+    "files": [
+      "main.js",
+      "preload.js",
+      "splash.html",
+      "printer.html",
+      "desktop.css",
+      "assets/**/*",
+      "app/**/*",
+      "resources/icon.ico"
+    ],
+    "win": {
+      "icon": "resources/icon.ico",
+      "target": [
+        { "target": "nsis", "arch": ["x64"] },
+        { "target": "portable", "arch": ["x64"] }
+      ]
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "perMachine": false,
+      "installerSidebar": "resources/installerSidebar.bmp",
+      "uninstallerSidebar": "resources/installerSidebar.bmp",
+      "shortcutName": "Rafiq POS",
+      "artifactName": "rafiq-setup-${version}-144.exe"
+    },
+    "portable": {
+      "artifactName": "rafiq-portable-${version}-144.exe"
+    }
+  }
+}

@@ -1,0 +1,232 @@
+{% extends "base.html" %}
+{% block title %}الإعدادات{% endblock %}
+{% block content %}
+<div class="h1">الإعدادات</div>
+
+<form method="post">
+<div class="card mt">
+  <div class="h2">بيانات المتجر (تظهر في الفاتورة)</div>
+  <label>اسم المتجر</label><input name="store_name" value="{{ S.store_name }}">
+  <label>شعار المتجر (يظهر على الفواتير والتقارير)</label>
+  <input type="file" accept="image/*" id="logoFile">
+  <input type="hidden" name="store_logo" id="storeLogo" value="{{ S.store_logo or '' }}">
+  <div class="hint">يُصغَّر تلقائياً. اختيار صورة جديدة يستبدل الشعار الحالي.</div>
+  <div id="logoPrev" class="mt">{% if S.store_logo %}<img src="{{ S.store_logo }}" alt="" style="max-height:80px">{% endif %}</div>
+  <button type="button" class="btn sm ghost" id="logoClear">إزالة الشعار</button>
+  <label>هاتف المتجر</label><input name="store_phone" value="{{ S.store_phone }}">
+  <label>مفتاح الدولة لأرقام الواتساب</label><input name="country_code" value="{{ S.country_code or '967' }}" inputmode="numeric" dir="ltr" placeholder="967">
+  <div class="hint">يُضاف تلقائياً للأرقام المحلية التي تبدأ بـ 0 (مثال: 0501110003 ← 967501110003).</div>
+  <label>العملة المكتوبة على الفواتير</label><input name="currency" value="{{ S.currency }}">
+  <label>تذييل الفاتورة</label><input name="invoice_footer" value="{{ S.invoice_footer }}">
+</div>
+
+<div class="card">
+  <div class="h2">واتساب: إرسال الفاتورة PDF تلقائياً عند البيع الآجل</div>
+  <div class="hint">يُرسل تلقائياً عند بيع آجل بقي فيه دين، بملف الفاتورة وإجمالي الدين. يحتاج حساب Meta Cloud API. التوكن يُحفظ في جهازك فقط ولا يظهر بعد الحفظ.</div>
+  <label>معرّف رقم الواتساب (Phone number ID)</label><input name="wa_phone_id" value="{{ S.wa_phone_id }}" dir="ltr" inputmode="numeric">
+  <label>التوكن الدائم {% if S.wa_token_set %}<span class="muted">(محفوظ — اكتب توكناً جديداً لاستبداله)</span>{% endif %}</label>
+  <input name="wa_token" type="password" value="" dir="ltr" autocomplete="off" placeholder="{{ 'محفوظ' if S.wa_token_set else 'EAAG…' }}">
+  <label>اسم قالب الرسالة المعتمد</label><input name="wa_template" value="{{ S.wa_template }}" dir="ltr">
+  <div class="hint">يجب أن يحتوي القالب على ترويسة مستند (PDF)، وفي النص متغيران: {{'{{1}}'}} إجمالي الفاتورة، {{'{{2}}'}} إجمالي الدين.</div>
+  <label>لغة القالب</label><input name="wa_lang" value="{{ S.wa_lang or 'ar' }}" dir="ltr">
+  <div class="hint">آخر حالة إرسال: {{ S.wa_last or 'لا يوجد إرسال بعد' }}</div>
+</div>
+
+<div class="card">
+  <div class="h2">صلاحيات العمال</div>
+  <div class="hint">حدّد النوافذ التي يفتحها كل عامل. الإعدادات وإدارة المستخدمين وإلغاء الفواتير للمالك وحده.</div>
+  {% set has_workers = false %}
+  {% for w in users_list %}
+    {% if w.role == 'worker' %}
+      {% set has_workers = true %}
+      <input type="hidden" name="perm_present_{{ w.id }}" value="1">
+      <div class="h2 mt" style="font-size:15px">{{ w.name }}</div>
+      {% for sc in screens %}
+        <div class="check">
+          <input type="checkbox" name="perm_{{ w.id }}_{{ sc.k }}" value="1" id="p{{ w.id }}_{{ sc.k }}" {% if w['p_' + sc.k] %}checked{% endif %}>
+          <label for="p{{ w.id }}_{{ sc.k }}" style="margin:0">{{ sc.l }}</label>
+        </div>
+      {% endfor %}
+    {% endif %}
+  {% endfor %}
+  {% if not has_workers %}<div class="muted small">لا يوجد عمال بعد.</div>{% endif %}
+</div>
+
+<div class="card">
+  <div class="h2">قواعد البيع</div>
+  <label>حد التنبيه الافتراضي للنواقص (لكل صنف جديد)</label>
+  <input name="low_stock_default" value="{{ S.low_stock_default }}" inputmode="decimal">
+  <label for="expiryDays">التنبيه بقرب انتهاء الصلاحية قبل كم يوم؟</label>
+  <input id="expiryDays" name="expiry_alert_days" type="number" inputmode="numeric" min="1" max="365" required value="{{ S.expiry_alert_days or '30' }}">
+  <div class="hint">يظهر للمالك على اللوحة وفي قائمة الأصناف عند فتح التطبيق؛ لا يرسل إشعار هاتف مغلقاً. التاريخ المسجل للصنف واحد، وليس تاريخ كل دفعة واردة.</div>
+  <label for="followupDays">متابعة الدين بعد كم يوم من أقدم مبلغ غير مسدد؟</label>
+  <input id="followupDays" name="debt_followup_days" type="number" inputmode="numeric" min="1" max="365" required value="{{ S.debt_followup_days or '30' }}">
+  <div class="hint">تُعتبر الدفعات تسديداً للأقدم أولاً. هذه قائمة متابعة داخل التطبيق، لا تُنشئ تاريخ استحقاق تعاقدياً ولا تُرسل رسائل تلقائياً؛ الدين المرحّل يؤرَّخ بتاريخ إنشاء حساب الزبون.</div>
+  <div class="check">
+    <input type="checkbox" name="allow_negative_stock" value="1" id="neg" {% if S.allow_negative_stock=='1' %}checked{% endif %}>
+    <label for="neg" style="margin:0">السماح بالبيع ولو نفد الرصيد (يسجّل الرصيد بالسالب مع تنبيه)</label>
+  </div>
+  <div class="check">
+    <input type="checkbox" name="allow_price_edit" value="1" id="pedit" {% if S.allow_price_edit=='1' %}checked{% endif %}>
+    <label for="pedit" style="margin:0">السماح للمالك بتعديل السعر داخل الفاتورة (للمرحلة 2 تفصيلاً)</label>
+  </div>
+  <div class="check">
+    <input type="checkbox" name="demo_hint" value="1" id="demo" {% if S.demo_hint=='1' %}checked{% endif %}>
+    <label for="demo" style="margin:0">إظهار رموز الدخول التجريبية في شاشة الدخول</label>
+  </div>
+</div>
+
+<button class="btn p lg wide">💾 حفظ الإعدادات</button>
+</form>
+
+<div class="card mt" id="cloudBootstrapLinkCard">
+  <div class="h2">☁️ تهيئة مشروع المتجر السحابي</div>
+  <div class="muted small">يدخل المالك رابط مشروع Supabase ومفتاحه العام من هاتفه. يُحفظان محلياً بتشفير Android Keystore، ولا تُفعّل المزامنة أو مشاركة بيانات الزبائن بمجرد الحفظ.</div>
+  <a class="btn ghost wide mt" href="/cloud/setup">فتح التهيئة السحابية</a>
+</div>
+
+<div class="card mt">
+  <div class="h2">اسم حساب المالك الظاهر في التطبيق</div>
+  <div class="muted small">يمكنك كتابة اسمك أو «مدير» أو «أدمن». هذا يغيّر الاسم المعروض في الدخول وخانة «الموظف» حتى عند إعادة طباعة فاتورة قديمة؛ لا يغيّر الصلاحية أو اسم المتجر أو مبالغ الفواتير.</div>
+  {% for account in users_list %}
+    {% if account.role == 'owner' %}
+      <form method="POST" action="{{ url_for('users_page') }}" class="row wrap mt" style="gap:8px">
+        <input type="hidden" name="uid" value="{{ account.id }}">
+        <input name="name" class="grow" maxlength="60" value="{{ account.name }}" aria-label="اسم حساب المالك" required>
+        <button class="btn sm p">حفظ الاسم</button>
+      </form>
+    {% endif %}
+  {% endfor %}
+</div>
+
+<div class="card mt">
+  <div class="h2">العاملون والصلاحيات</div>
+  <div class="muted small">رموز الدخول 4 أرقام. في إصدار النشر تُوقَف الحسابات التي ما زالت تستعمل الرموز التجريبية؛ غيّر رمز العامل الموقوف لتفعيله من جديد. العامل يرى النوافذ التي تحددها له؛ المالك يرى كل شيء.</div>
+  <table class="tbl mt">
+    <tr><th>الاسم</th><th>الصلاحية</th><th>تغيير الرمز</th></tr>
+    {% for us in users_list %}
+      <tr>
+        <td><b>{{ us.name }}</b>{% if us.active == 0 %}<div class="muted small">موقوف حتى تغيير الرمز</div>{% endif %}</td>
+        <td>{% if us.role=='owner' %}<span class="pill b">مالك</span>{% else %}<span class="pill gray">عامل</span>{% endif %}</td>
+        <td>
+          <form method="POST" action="{{ url_for('users_page') }}" class="row" style="gap:6px">
+            <input type="hidden" name="uid" value="{{ us.id }}">
+            <input name="pin" placeholder="رمز جديد" style="width:110px" inputmode="numeric" maxlength="4">
+            <button class="btn sm ghost">تغيير</button>
+          </form>
+        </td>
+      </tr>
+    {% endfor %}
+  </table>
+  <form method="POST" action="{{ url_for('users_page') }}" class="row mt" style="gap:6px">
+    <input name="name" placeholder="اسم عامل جديد" class="grow">
+    <input name="pin" placeholder="رمز 4 أرقام" style="width:112px" inputmode="numeric" pattern="[0-9]{4}" maxlength="4" required>
+    <button class="btn sm p">إضافة</button>
+  </form>
+</div>
+
+<div class="card mt" id="backupTools">
+  <div class="h2">نسخة احتياطية مشفّرة — تصدير وفحص تجريبيان</div>
+  <div class="muted small">قاعدة البيع الأصلية تبقى على الهاتف. تحفظ ملفاً مشفّراً في المكان الذي تختاره (وقد يكون مزوّد تخزين سحابياً)، ثم تفحصه بعبارته. لا يرفع التطبيق شيئاً تلقائياً. <b>الاستعادة غير متاحة بعد</b>؛ لا تحذف التطبيق أو تمسح بياناته أو تثبّت تحديثاً يتطلب إزالته.</div>
+  <div class="hint mt">اختر عبارة قوية لا تقل عن 12 حرفاً، واحتفظ بها أنت في مكان آمن. نسيانها يعني عدم القدرة على فتح الملف. لا ترسلها لأحد ولا تُحفظ في إعدادات التطبيق.</div>
+  <label for="backupPhrase">عبارة مرور النسخة الجديدة</label>
+  <input type="password" id="backupPhrase" minlength="12" maxlength="256" autocomplete="off" spellcheck="false" dir="auto" placeholder="12 حرفاً على الأقل">
+  <label for="backupConfirm">تأكيد عبارة المرور</label>
+  <input type="password" id="backupConfirm" minlength="12" maxlength="256" autocomplete="off" spellcheck="false" dir="auto" placeholder="أعد كتابة العبارة">
+  <button type="button" class="btn p mt" id="backupExport">حفظ نسخة مشفّرة في ملف</button>
+  <div class="hint mt">لفحص ملف سبق حفظه: أدخل عبارته ثم اختره من ملفات الهاتف. لا يغيّر الفحص بيانات البيع.</div>
+  <label for="backupInspectPhrase">عبارة مرور الملف المراد فحصه</label>
+  <input type="password" id="backupInspectPhrase" minlength="12" maxlength="256" autocomplete="off" spellcheck="false" dir="auto" placeholder="عبارة الملف المختار">
+  <button type="button" class="btn ghost mt" id="backupInspect">اختر ملفاً وافحصه (دون استعادة)</button>
+  <div class="hint mt" id="backupStatus" role="status" aria-live="polite"></div>
+</div>
+
+<div class="card">
+  <div class="h2">الأوامر الصوتية بالعربية — تجربة</div>
+  <div class="hint">اضغط 🎤 ثم «ابدأ الاستماع». قد تحتاج خدمة الهاتف إلى الإنترنت وقد ترسل الصوت لمزوّدها؛ لا يحفظ رفيق التسجيل. أمثلة: «أضف حليب عدد 2» في شاشة البيع لإضافته إلى السلة، «أضف صنف جديد قهوة بسعر 30» لتعبئة نموذج يراجعه المالك ويحفظه بيده، «بيع نقدي» أو «بيع آجل» لفتح مراجعة الدفع، «اطبع الفاتورة» لفاتورة محفوظة، «شارك الفاتورة» لفتح مشاركة PDF مع زبون مرتبط برقم. راجع الصنف والكمية والإجمالي والزبون؛ لا يُحفظ بيع/دين إلا بضغط زر التأكيد في شاشة الدفع. اختر مستلم PDF بنفسك داخل تطبيق الإرسال؛ لا يوجد إرسال تلقائي عام أو تنفيذ لأوامر مجهولة.</div>
+</div>
+
+<div class="card">
+  <div class="h2">فحص سرعة ماسح الباركود</div>
+  <div class="muted small">امسح باركوداً حقيقياً من شاشة البيع ثم عد إلى هنا. زمن «بدء الكاميرا» حتى ظهور المعاينة، وزمن «التركيز/القراءة والعودة» بعدها؛ الأخير لا يفصل التركيز عن فكّ الكود أو إغلاق نشاط الكاميرا. لا تُرسل هذه الأرقام ولا يُحفظ الباركود.</div>
+  <div class="hint mt" id="scanTiming">لم يُقَس مسح ناجح في هذه الجلسة بعد.</div>
+</div>
+
+<div class="card">
+  <div class="h2">عن النسخة</div>
+  <div class="muted small">البيع والبيانات محفوظان محلياً على هذا الهاتف. التصدير والفحص تجريبيان وليسا بديلاً عن استعادة اختُبرت على الهاتف؛ لا توجد مزامنة مع Supabase. لا تحذف التطبيق ولا تمسح بياناته ولا تُثبّت نسخة تتطلب حذفه.</div>
+</div>
+{% endblock %}
+{% block scripts %}
+<script>
+(function(){
+  var el=document.getElementById('scanTiming');
+  if(!el || !window.RafiqDevice || !window.RafiqDevice.scanDiagnostics) return;
+  try {
+    var d=JSON.parse(window.RafiqDevice.scanDiagnostics());
+    if(d.total_ms != null) el.textContent='آخر مسح: بدء الكاميرا '+(d.ready_ms == null ? 'غير مقاس' : d.ready_ms+' مللي ثانية')+
+      ' • التركيز/القراءة/العودة '+(d.reading_ms == null ? 'غير مقاس' : d.reading_ms+' مللي ثانية')+
+      ' • الإجمالي '+d.total_ms+' مللي ثانية.';
+  } catch(e){}
+})();
+(function(){
+  var f=document.getElementById('logoFile'), h=document.getElementById('storeLogo'), p=document.getElementById('logoPrev');
+  if(!f) return;
+  f.onchange=function(){
+    var file=f.files&&f.files[0]; if(!file) return;
+    var r=new FileReader();
+    r.onload=function(){
+      var im=new Image();
+      im.onload=function(){
+        var max=240, k=Math.min(1, max/Math.max(im.width, im.height));
+        var c=document.createElement('canvas'); c.width=Math.round(im.width*k); c.height=Math.round(im.height*k);
+        c.getContext('2d').drawImage(im,0,0,c.width,c.height);
+        var url=c.toDataURL('image/png');
+        h.value=url; p.innerHTML='<img src="'+url+'" alt="" style="max-height:80px">';
+      };
+      im.src=r.result;
+    };
+    r.readAsDataURL(file);
+  };
+  document.getElementById('logoClear').onclick=function(){ h.value=''; p.innerHTML=''; f.value=''; };
+})();
+(function(){
+  var status=document.getElementById('backupStatus');
+  if(!status) return;
+  function update(message, ok){
+    // تحديث عنصر الشاشة الحالية فقط؛ قد يكون المستخدم تنقّل قبل اكتمال اختيار الملف.
+    var current=document.getElementById('backupStatus');
+    if(!current) return;
+    current.textContent=message;
+    current.style.color=ok === false ? '#a52222' : '#17513c';
+    var x=document.getElementById('backupExport'), y=document.getElementById('backupInspect');
+    if(x) x.disabled=false;
+    if(y) y.disabled=false;
+  }
+  window.__rafiqBackupResult=update;
+  function start(kind){
+    var device=window.RafiqDevice;
+    if(!device || !device.backupExport || !device.backupInspect){
+      update('هذه الوظيفة متاحة في تطبيق أندرويد الجديد فقط، وليست نسخة الويب.', false); return;
+    }
+    var a=document.getElementById(kind === 'export' ? 'backupPhrase' : 'backupInspectPhrase');
+    var c=document.getElementById('backupConfirm');
+    var phrase=a.value;
+    if(phrase.length < 12 || phrase.length > 256){ update('اكتب عبارة مرور بين 12 و256 حرفاً.', false); return; }
+    if(kind === 'export' && phrase !== c.value){ update('تأكيد عبارة المرور لا يطابقها.', false); return; }
+    a.value='';
+    if(kind === 'export') c.value='';
+    var x=document.getElementById('backupExport'), y=document.getElementById('backupInspect');
+    x.disabled=true; y.disabled=true;
+    status.textContent=kind === 'export' ? 'جارٍ تجهيز النسخة المشفّرة؛ انتظر اختيار مكان حفظها…' : 'اختر ملف النسخة من ملفات هاتفك للفحص…';
+    status.style.color='#17513c';
+    try {
+      var accepted=kind === 'export' ? device.backupExport(phrase) : device.backupInspect(phrase);
+      if(!accepted) update('تعذّر بدء العملية: تأكّد من دخول المالك، وعبارة المرور، وعدم وجود عملية نسخ أخرى.', false);
+    } catch(e){ update('تعذّر بدء العملية. أعد المحاولة.', false); }
+  }
+  document.getElementById('backupExport').onclick=function(){ start('export'); };
+  document.getElementById('backupInspect').onclick=function(){ start('inspect'); };
+})();
+</script>
+{% endblock %}

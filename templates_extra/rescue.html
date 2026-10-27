@@ -1,0 +1,63 @@
+{% extends "base.html" %}
+{% block title %}نسخة نجاة للمالك{% endblock %}
+{% block wrap %}
+<div class="wrap">
+  <div class="card mt">
+    <div class="h1">🔐 نسخ بياناتك بأمان</div>
+    <div class="flash {{ 'ok' if license_ok else 'error' }} mt">{% if license_ok %}الرخصة سارية؛ هذه صفحة نسخ نجاة اختيارية.{% else %}الرخصة غير سارية أو تحتاج تجديداً. البيع وتعديل البيانات معطلان؛ يستطيع المالك فقط تصدير نسخة مشفّرة وفحصها.{% endif %}</div>
+    <div class="hint mt">الاستعادة غير متاحة في هذه النسخة. لا تحذف التطبيق أو بياناته، ولا تعتبر التصدير ناجحاً حتى يؤكد حفظ الملف وفحص مطابقته.</div>
+    <label for="backupPhrase">عبارة مرور جديدة للنسخة (12–256 حرفاً)</label>
+    <input id="backupPhrase" type="password" minlength="12" maxlength="256" autocomplete="off" spellcheck="false" placeholder="اكتب عبارة لا تعرفها إلا أنت">
+    <label for="backupConfirm">تأكيد العبارة</label>
+    <input id="backupConfirm" type="password" minlength="12" maxlength="256" autocomplete="off" spellcheck="false">
+    <button id="backupExport" class="btn p wide mt" type="button">حفظ نسخة مشفّرة في ملف</button>
+    <label for="backupInspectPhrase">لفحص ملف محفوظ: عبارة مروره</label>
+    <input id="backupInspectPhrase" type="password" minlength="12" maxlength="256" autocomplete="off" spellcheck="false">
+    <button id="backupInspect" class="btn ghost wide mt" type="button">اختيار ملف وفحصه (دون استعادة)</button>
+    <div id="backupStatus" class="hint mt" role="status" aria-live="polite"></div>
+    <a class="btn ghost wide mt" href="/license">← العودة لتفعيل الرخصة</a>
+    <a class="btn ghost wide mt" href="/logout">خروج</a>
+  </div>
+</div>
+{% endblock %}
+{% block scripts %}
+<script>
+(function(){
+  var status=document.getElementById('backupStatus');
+  if(!status) return;
+  function update(message, ok){
+    var current=document.getElementById('backupStatus');
+    if(!current) return;
+    current.textContent=message;
+    current.style.color=ok === false ? '#a52222' : '#17513c';
+    var x=document.getElementById('backupExport'), y=document.getElementById('backupInspect');
+    if(x) x.disabled=false;
+    if(y) y.disabled=false;
+  }
+  window.__rafiqBackupResult=update;
+  function start(kind){
+    var device=window.RafiqDevice;
+    if(!device || !device.backupExport || !device.backupInspect){
+      update('هذه الوظيفة متاحة في تطبيق أندرويد فقط.', false); return;
+    }
+    var a=document.getElementById(kind === 'export' ? 'backupPhrase' : 'backupInspectPhrase');
+    var c=document.getElementById('backupConfirm');
+    var phrase=a.value;
+    if(phrase.length < 12 || phrase.length > 256){ update('اكتب عبارة مرور بين 12 و256 حرفاً.', false); return; }
+    if(kind === 'export' && phrase !== c.value){ update('تأكيد عبارة المرور لا يطابقها.', false); return; }
+    a.value='';
+    if(kind === 'export') c.value='';
+    var x=document.getElementById('backupExport'), y=document.getElementById('backupInspect');
+    x.disabled=true; y.disabled=true;
+    status.textContent=kind === 'export' ? 'جارٍ تجهيز النسخة؛ انتظر اختيار مكان حفظها…' : 'اختر ملف النسخة لفحصه…';
+    status.style.color='#17513c';
+    try {
+      var accepted=kind === 'export' ? device.backupExport(phrase) : device.backupInspect(phrase);
+      if(!accepted) update('تعذّر بدء العملية: تأكّد من دخول المالك والعبارة وعدم وجود عملية أخرى.', false);
+    } catch(e){ update('تعذّر بدء العملية. أعد المحاولة.', false); }
+  }
+  document.getElementById('backupExport').onclick=function(){ start('export'); };
+  document.getElementById('backupInspect').onclick=function(){ start('inspect'); };
+})();
+</script>
+{% endblock %}

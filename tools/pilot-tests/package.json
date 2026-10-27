@@ -1,0 +1,11 @@
+{
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "node control_plane.test.mjs && node financial_ledger.test.mjs && node install_bundle.test.mjs && node web_contract.test.mjs && node web_ui.test.mjs && node embedded_client.test.mjs && node core_ui_119.test.mjs && node offline_sync.test.mjs && node catalog_read_security.test.mjs && node device_transfer.test.mjs && node navigation_127.test.mjs && node owner_session_128.test.mjs && node polish_130.test.mjs && node launch_package.test.mjs && node purchase_draft.test.mjs"
+  },
+  "devDependencies": {
+    "@electric-sql/pglite": "0.5.10",
+    "jsdom": "26.1.0"
+  }
+}

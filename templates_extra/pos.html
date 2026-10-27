@@ -1,0 +1,684 @@
+{% extends "base.html" %}
+{% block title %}البيع{% endblock %}
+{% block bodyclass %}{% endblock %}
+{% block wrap %}
+{% if cloud_shift_only %}
+<div class="wrap">
+  <div class="h1">🛒 البيع</div>
+  <div class="flash error">توقّف البيع والآجل من الشاشة المحلية: الوردية السابقة على هذا الهاتف ليست تصريحاً من الخادم، ولم يُربط دفتر البيع والديون الأصلي بعد.</div>
+  <p class="card">افتح <a href="{{ url_for('cash') }}">شاشة الصندوق الأصلية</a> لطلب الوردية ومتابعة قرار المالك. لا تسجّل بيعاً نقدياً أو بالدين حتى تُستكمل المرحلة الثانية ويجتاز التطبيق اختبار الهاتفين.</p>
+</div>
+{% else %}
+<div class="pos-wrap">
+  {% set msgs = get_flashed_messages(with_categories=true) %}
+    {% for cat, m in msgs %}<div class="flash {{ cat }}">{{ m }}</div>{% endfor %}
+  
+
+  <div class="hint" style="margin:10px 0">هذه شاشة البيع <b>المحلية القديمة</b>، ولا تُزامن فواتيرها مع مشروع الاختبار. <a href="/cloud/pilot">افتح تجربة البيع السحابي المنفصلة</a>.</div>
+  {% if not shift %}
+  <div class="flash error">
+    الصندوق مغلق — لا يمكن البيع الآن.
+    <a href="{{ url_for('cash') }}">افتح الوردية من هنا</a>
+  </div>
+  {% endif %}
+
+  <div class="scanbar">
+    <div class="box">
+      <input id="scan" class="big" placeholder="باركود الصنف أو اسمه…" autocomplete="off"
+             inputmode="text" {% if not shift %}disabled{% endif %}>
+      <button class="btn p" id="addFound" style="min-width:74px">إضافة</button>
+      <button class="btn ghost" id="camBtn" title="قراءة بالكاميرا" style="min-width:58px">📷</button>
+      <button class="btn ghost" id="listBtn" title="قائمة الأصناف" style="min-width:58px">📋</button>
+    </div>
+    <div id="suggest" class="suggest hide"></div>
+  </div>
+
+  <div class="card tight">
+    <div class="row">
+      <div class="h2 grow">سلة البيع <span class="pill b" id="cnt">0</span></div>
+      <button class="btn sm ghost" id="clearBtn">تفريغ السلة</button>
+    </div>
+    <div id="cart"></div>
+    <div id="emptyMsg" class="center muted mt">السلة فارغة — امسح باركود أو ابحث عن صنف</div>
+  </div>
+</div>
+
+<!-- شريط الدفع السفلي -->
+<div class="paybar no-print">
+  <div class="paybar-in">
+    <div class="totrow">
+      <span class="muted">الإجمالي</span>
+      <span class="grand grow" id="totalView">0 {{ S.currency }}</span>
+      <button class="btn sm ghost" id="discBtn">خصم</button>
+      <span class="pill a hide" id="discPill"></span>
+    </div>
+    <div class="actions">
+      <button class="btn p lg pay-action" data-pt="cash" {% if not shift %}disabled{% endif %}>💵 بيع نقدي (F1)</button>
+      <button class="btn amber lg pay-action" data-pt="credit" {% if not shift %}disabled{% endif %}>📒 آجل (F2)</button>
+      <button class="btn ghost lg" id="holdBtn" title="تعليق الفاتورة">⏸ تعليق</button>
+      <button class="btn ghost lg" id="resumeBtn" title="استرجاع معلَّقة">▶ استرجاع</button>
+    </div>
+  </div>
+</div>
+
+<!-- نافذة الدفع النقدي -->
+<div class="modal" id="cashModal"><div class="sheet">
+  <div class="h2">💵 دفع نقدي</div>
+  <div class="center mt">
+    <div class="muted small">المطلوب</div>
+    <div class="amt h1" id="cashDue">0</div>
+  </div>
+  <label>المستلم من الزبون</label>
+  <input id="received" class="big center" inputmode="decimal" value="">
+  <div class="card tight mt">
+    <div class="muted small">جزء بحوالة أو محفظة أو إيداع (اختياري)، ويُخصم من المطلوب نقداً</div>
+    <div class="row">
+      <select id="ncaMethod"><option value="transfer">حوالة</option><option value="wallet">محفظة</option><option value="deposit">إيداع</option></select>
+      <input id="ncaAmount" inputmode="decimal" placeholder="المبلغ">
+    </div>
+    <input id="ncaRef" placeholder="رقم المرجع (إلزامي عند المبلغ)">
+  </div>
+
+  <div class="quick-amts" id="quickAmts"></div>
+  <div class="row mt">
+    <div class="card tight grow center"><div class="muted small">الباقي للزبون</div>
+      <div class="h1" id="changeView">0</div></div>
+  </div>
+  <div class="num-pad">
+    {% for n in ['1','2','3','4','5','6','7','8','9','.','0','⌫'] %}
+      <button type="button" class="btn" data-nk="{{ n }}">{{ n }}</button>
+    {% endfor %}
+  </div>
+  <div class="btn-grid mt">
+    <button class="btn p lg" id="cashConfirm" style="grid-column:span 2">تأكيد البيع ✔</button>
+    <button class="btn ghost lg" onclick="closeModal('cashModal')" style="grid-column:span 2">رجوع</button>
+  </div>
+</div></div>
+
+<!-- نافذة الآجل -->
+<div class="modal" id="creditModal"><div class="sheet">
+  <div class="h2">📒 بيع آجل</div>
+  <label for="custSearch">الزبون — الرمز السريع أو الاسم أو الهاتف</label>
+  <input id="custSearch" placeholder="مثلاً #00042 ثم إدخال؛ أو اكتب الاسم/الهاتف" autocomplete="off" enterkeyhint="done">
+  <div id="custResults" class="suggest hide"></div>
+  <div class="card tight mt row hide" id="custChosen">
+    <div class="grow"><b id="custName"></b> <b id="custCode" dir="ltr"></b><div class="muted small" id="custBal"></div></div>
+    <button type="button" class="btn sm ghost" onclick="clearCreditCustomer()">تغيير</button>
+  </div>
+  <button class="btn ghost wide mt" onclick="showNewCust()">➕ زبون جديد</button>
+  <div id="newCustBox" class="hide">
+    <label>اسم الزبون الجديد</label>
+    <input id="newCustName" placeholder="الاسم الكامل">
+    <label>الهاتف (اختياري — للواتساب)</label>
+    <input id="newCustPhone" inputmode="tel">
+    <button type="button" class="btn blue wide mt" id="newCustSave" onclick="createCust()">أضف الزبون</button>
+  </div>
+  <label>دفعة مقدَّمة الآن نقداً (اختياري)</label>
+  <input id="creditPaid" inputmode="decimal" placeholder="0">
+  <div class="card tight mt">
+    <div class="muted small">جزء بحوالة أو محفظة أو إيداع (اختياري)، ويُخصم من المطلوب نقداً</div>
+    <div class="row">
+      <select id="ncbMethod"><option value="transfer">حوالة</option><option value="wallet">محفظة</option><option value="deposit">إيداع</option></select>
+      <input id="ncbAmount" inputmode="decimal" placeholder="المبلغ">
+    </div>
+    <input id="ncbRef" placeholder="رقم المرجع (إلزامي عند المبلغ)">
+  </div>
+
+  <div class="card tight mt center">
+    <div class="muted small">المتبقي على الزبون (دين)</div>
+    <div class="h1" id="creditDueView">0</div>
+  </div>
+  <div class="btn-grid mt">
+    <button class="btn amber lg" id="creditConfirm" style="grid-column:span 2">تأكيد الآجل ✔</button>
+    <button class="btn ghost lg" onclick="closeModal('creditModal')" style="grid-column:span 2">رجوع</button>
+  </div>
+</div></div>
+
+<!-- نافذة الخصم -->
+<div class="modal" id="discModal"><div class="sheet">
+  <div class="h2">خصم على الفاتورة</div>
+  <label>قيمة الخصم</label>
+  <input id="discInput" class="big" inputmode="decimal" placeholder="0">
+  <div class="btn-grid mt">
+    <button class="btn p" id="discApply">تطبيق</button>
+    <button class="btn ghost" onclick="closeModal('discModal')">إلغاء</button>
+  </div>
+</div></div>
+
+<!-- نافذة النجاح -->
+<div class="modal" id="doneModal"><div class="sheet">
+  <div class="bigmsg">
+    <div class="ok-ic">✅</div>
+    <div class="h1">تم حفظ الفاتورة</div>
+    <div class="muted" id="doneInfo"></div>
+    <div class="amt" id="doneChange"></div>
+    <div class="muted small mt" id="doneHint"></div>
+  </div>
+  <div class="btn-grid">
+    <a class="btn p lg" id="printLink" target="_blank" style="grid-column:span 2">🖨 طباعة الفاتورة</a>
+    <a class="btn ghost lg" id="invoiceViewLink" style="grid-column:span 2">📄 عرض الفاتورة</a>
+    <button class="btn blue lg" onclick="closeModal('doneModal')" style="grid-column:span 2">فاتورة جديدة (Esc)</button>
+  </div>
+</div></div>
+
+<!-- عدة أوجه بيع بالباركود نفسه: لا يُضاف أي وجه قبل اختيار البائع -->
+<div class="modal" id="variantModal"><div class="sheet">
+  <div class="h2">اختر الوجه والسعر لهذا الباركود</div>
+  <label for="variantChoice">الصنف المطلوب</label>
+  <select id="variantChoice" class="big"></select>
+  <div class="muted small mt">الرصيد المعروض يتبع إعداد كل وجه: مستقل أو مشترك. يُحسب السعر من الوجه المختار فقط.</div>
+  <div class="btn-grid mt">
+    <button class="btn p" id="variantConfirm" type="button">إضافة الوجه المختار</button>
+    <button class="btn ghost" type="button" onclick="closeModal('variantModal')">إلغاء</button>
+  </div>
+</div></div>
+
+<!-- نافذة قائمة الأصناف -->
+<div class="modal" id="listModal"><div class="sheet">
+  <div class="h2">📋 الأصناف</div>
+  <input id="listSearch" placeholder="ابحث بالاسم أو الباركود…" autocomplete="off">
+  <div id="listResults" class="mt"></div>
+  <button class="btn ghost wide mt" onclick="closeModal('listModal')">إغلاق</button>
+</div></div>
+
+<!-- نافذة الكاميرا -->
+<div class="modal" id="camModal"><div class="sheet">
+  <div class="h2">📷 قراءة الباركود بالكاميرا</div>
+  <div class="muted small">وجّه الكاميرا نحو الباركود…</div>
+  <video id="camVideo" style="width:100%;border-radius:12px;margin-top:8px;background:#000" playsinline muted></video>
+  <div class="muted small mt" id="camNote"></div>
+  <button class="btn ghost wide mt" id="camStop">إغلاق الكاميرا</button>
+</div></div>
+
+{% endif %}
+{% endblock %}
+
+{% block scripts %}
+{% if not cloud_shift_only %}
+<script>
+let cart = [];            // {id, name, unit, price_cents, qty, stock}
+let discount = 0;
+let chosenCustomer = null;
+let heldCart = null;
+let lastInvoice = null;
+const currency = "{{ S.currency }}";
+
+/* ================= السلة ================= */
+function renderCart(){
+  const box = document.getElementById('cart');
+  box.innerHTML = '';
+  document.getElementById('emptyMsg').classList.toggle('hide', cart.length>0);
+  let total = 0;
+  cart.forEach((l, i)=>{
+    const lineTot = Math.round(l.price_cents * l.qty);
+    total += lineTot;
+    const d = document.createElement('div');
+    d.className = 'cart-line';
+    d.innerHTML = `
+      <div class="nm">${l.name}<small>${l.loc? '<span class="loc-chip">📍 '+l.loc+'</span> ':''}${money(l.price_cents)} × ${l.unit||''} ${l.stock<=l.qty? '• <span style="color:#b45309">رصيد: '+l.stock+'</span>':''}</small></div>
+      <div class="qtybtns">
+        <button class="qbtn" data-i="${i}" data-d="-1">−</button>
+        <input class="qtyin" data-i="${i}" value="${l.qty}" inputmode="decimal">
+        <button class="qbtn plus" data-i="${i}" data-d="1">+</button>
+      </div>
+      <div class="line-tot">${money(lineTot)}</div>
+      <button class="del" data-i="${i}">✕</button>`;
+    box.appendChild(d);
+  });
+  document.getElementById('cnt').textContent = cart.length;
+  const grand = Math.max(0, total - discount);
+  document.getElementById('totalView').textContent = money(grand);
+  const dp = document.getElementById('discPill');
+  dp.classList.toggle('hide', discount<=0);
+  dp.textContent = 'خصم ' + money(discount);
+  return grand;
+}
+function cartTotal(){ return cart.reduce((s,l)=>s+Math.round(l.price_cents*l.qty),0); }
+
+document.getElementById('cart').addEventListener('click', e=>{
+  const q = e.target.closest('.qbtn');
+  if(q){
+    const i = +q.dataset.i, d = +q.dataset.d;
+    cart[i].qty = Math.max(1, round3(cart[i].qty + d));
+    renderCart(); return;
+  }
+  const del = e.target.closest('.del');
+  if(del){ cart.splice(+del.dataset.i,1); renderCart(); }
+});
+document.getElementById('cart').addEventListener('change', e=>{
+  if(e.target.classList.contains('qtyin')){
+    const i = +e.target.dataset.i;
+    const v = parseFloat(e.target.value.replace(',','.'));
+    cart[i].qty = (v>0)? round3(v) : 1;
+    renderCart();
+  }
+});
+function round3(n){ return Math.round(n*1000)/1000; }
+
+function addToCart(p, count=1){
+  const ex = cart.find(l=>l.id===p.id);
+  if(ex){ ex.qty = round3(ex.qty+count); }
+  else{ cart.push({id:p.id, name:p.name, unit:p.unit, price_cents:p.price_cents, qty:count, stock:p.stock, loc:p.loc||''}); }
+  beep(); vib();
+  renderCart();
+}
+function clearCart(){ cart=[]; discount=0; renderCart(); }
+document.getElementById('clearBtn').onclick = ()=>{ if(cart.length && confirm('تفريغ السلة؟')) clearCart(); };
+
+/* ================= البحث والمسح ================= */
+const scan = document.getElementById('scan');
+scan.addEventListener('keydown', e=>{ if(e.key==='Enter'){ e.preventDefault(); lookup(scan.value); } });
+scan.addEventListener('input', ()=>{ if(scan.value.length>=2) suggest(scan.value); else hideSuggest(); });
+document.getElementById('addFound').onclick = ()=>lookup(scan.value);
+
+let barcodeChoices = [];
+function chooseBarcodeVariant(choices){
+  barcodeChoices = choices;
+  const s = document.getElementById('variantChoice');
+  s.innerHTML = '';
+  const prompt = document.createElement('option');
+  prompt.value = ''; prompt.textContent = 'اختر النوع قبل إضافته…';
+  s.appendChild(prompt);
+  choices.forEach(p=>{
+    const opt = document.createElement('option');
+    opt.value = String(p.id);
+    opt.textContent = p.name + ' — ' + money(p.price_cents) + ' — رصيد ' + p.stock;
+    s.appendChild(opt);
+  });
+  s.value = '';
+  scan.value = '';
+  openModal('variantModal');
+  s.focus();
+}
+document.getElementById('variantConfirm').onclick = ()=>{
+  const id = Number(document.getElementById('variantChoice').value);
+  const choice = barcodeChoices.find(p=>p.id === id);
+  if (!choice){ beep(false); toast('اختر وجه البيع أولاً', 'err'); return; }
+  addToCart(choice);
+  barcodeChoices = [];
+  closeModal('variantModal');
+  scan.focus();
+};
+async function lookup(code){
+  code = (code||'').trim(); if(!code) return;
+  const j = await api('/api/find', {code});
+  hideSuggest();
+  if(j.ok && j.choices && j.choices.length > 1){ chooseBarcodeVariant(j.choices); }
+  else if(j.ok && j.product){ addToCart(j.product); scan.value=''; scan.focus(); }
+  else if(j.suggestions && j.suggestions.length){ showSuggest(j.suggestions); }
+  else { beep(false); toast(j.error||'لم يُعثر على الصنف','err'); }
+}
+let sugTimer;
+function suggest(q){
+  clearTimeout(sugTimer);
+  sugTimer = setTimeout(async ()=>{
+    const j = await api('/api/search?q='+encodeURIComponent(q));
+    if(j.ok && j.products.length) showSuggest(j.products); else hideSuggest();
+  }, 220);
+}
+function showSuggest(list){
+  const s = document.getElementById('suggest');
+  s.innerHTML = '';
+  list.forEach(p=>{
+    const b = document.createElement('button');
+    b.innerHTML = `<b>${p.name}</b> <span class="pr">— ${money(p.price_cents)} • رصيد ${p.stock} ${p.barcode? '• '+p.barcode : ''}</span>`;
+    b.onclick = ()=>{ addToCart(p); scan.value=''; hideSuggest(); scan.focus(); };
+    s.appendChild(b);
+  });
+  s.classList.remove('hide');
+}
+function hideSuggest(){ document.getElementById('suggest').classList.add('hide'); }
+
+/* قارئ الباركود يعمل في أي مكان بالشاشة */
+watchScanner(code=>{ if(!document.querySelector('.modal.open')) lookup(code); });
+
+/* ================= الدفع ================= */
+document.querySelectorAll('.pay-action').forEach(b=>{
+  b.onclick = ()=>{
+    if(!cart.length){ beep(false); toast('السلة فارغة','err'); return; }
+    if(b.dataset.pt==='cash') openCash(); else openCredit();
+  };
+});
+
+function openCash(){
+  const total = Math.max(0, cartTotal()-discount);
+  document.getElementById('cashDue').textContent = money(total);
+  document.getElementById('received').value = '';
+  updChange();
+  const quick = document.getElementById('quickAmts');
+  quick.innerHTML = '';
+  // أزرار سريعة: المبلغ بالضبط + أقرب فئات
+  const vals = [total, Math.ceil(total/1000)*1000, Math.ceil(total/5000)*5000, Math.ceil(total/10000)*10000];
+  [...new Set(vals)].slice(0,4).forEach(v=>{
+    const b = document.createElement('button');
+    b.className = 'btn'; b.textContent = money(v);
+    b.onclick = ()=>{ document.getElementById('received').value = String(Math.round(v/100)); updChange(); };
+    quick.appendChild(b);
+  });
+  openModal('cashModal');
+}
+/* الأجزاء غير النقدية (حوالة/محفظة/إيداع) لنافذة معيّنة: البادئة nca للنقد، ncb للآجل */
+function nonCashParts(p){
+  const amt = cents(document.getElementById(p+'Amount').value);
+  if(!amt) return [];
+  return [{method: document.getElementById(p+'Method').value, amount_cents: amt,
+           reference: document.getElementById(p+'Ref').value.trim()}];
+}
+function nonCashSum(p){ return nonCashParts(p).reduce((a,x)=>a+x.amount_cents, 0); }
+function updChange(){
+  const total = Math.max(0, cartTotal()-discount-nonCashSum('nca'));
+  document.getElementById('cashDue').textContent = money(total);
+  const rec = cents(document.getElementById('received').value);
+  const ch = rec-total;
+  const el = document.getElementById('changeView');
+  el.textContent = money(Math.max(0,ch));
+  el.style.color = (rec>0 && ch<0)? '#b91c1c' : '';
+}
+document.getElementById('received').addEventListener('input', updChange);
+['ncaAmount','ncaMethod','ncaRef'].forEach(id=>document.getElementById(id).addEventListener('input', updChange));
+document.querySelector('#cashModal .num-pad').addEventListener('click', e=>{
+  const b = e.target.closest('[data-nk]'); if(!b) return;
+  const inp = document.getElementById('received');
+  const k = b.dataset.nk;
+  if(k==='⌫') inp.value = inp.value.slice(0,-1);
+  else if(k==='.' && inp.value.includes('.')) {}
+  else inp.value += k;
+  updChange();
+});
+document.getElementById('cashConfirm').onclick = async ()=>{
+  const total = Math.max(0, cartTotal()-discount);
+  const nc = nonCashParts('nca');
+  const cashDue = Math.max(0, total - nonCashSum('nca'));
+  const rec = cents(document.getElementById('received').value) || cashDue;
+  if(nonCashSum('nca') > total){ beep(false); toast('مجموع الحوالة والمحفظة أكبر من الإجمالي','err'); return; }
+  if(rec < cashDue){ beep(false); toast('المستلم نقداً أقل من المطلوب','err'); return; }
+  await submitSale({payment_type:'cash', received_cents: rec, discount_cents: discount, non_cash: nc});
+};
+
+function openCredit(){
+  clearTimeout(custTimer);
+  custQuerySeq++;
+  chosenCustomer = null;
+  document.getElementById('custChosen').classList.add('hide');
+  document.getElementById('custResults').classList.add('hide');
+  document.getElementById('custSearch').value = '';
+  document.getElementById('creditPaid').value = '';
+  document.getElementById('newCustBox').classList.add('hide');
+  updCreditDue();
+  openModal('creditModal');
+  document.getElementById('custSearch').focus();
+}
+function updCreditDue(){
+  const total = Math.max(0, cartTotal()-discount);
+  const paid = Math.min(cents(document.getElementById('creditPaid').value) + nonCashSum('ncb'), total);
+  document.getElementById('creditDueView').textContent = money(total-paid);
+}
+document.getElementById('creditPaid').addEventListener('input', updCreditDue);
+['ncbAmount','ncbMethod','ncbRef'].forEach(id=>document.getElementById(id).addEventListener('input', updCreditDue));
+
+let custTimer, custQuerySeq = 0;
+function selectCreditCustomer(c){
+  chosenCustomer = c;
+  document.getElementById('custChosen').classList.remove('hide');
+  document.getElementById('custName').textContent = c.name;
+  document.getElementById('custCode').textContent = c.code;
+  document.getElementById('custBal').textContent = 'الرصيد الحالي: ' + money(c.balance_cents);
+  document.getElementById('custSearch').value = c.code;
+  document.getElementById('custResults').classList.add('hide');
+}
+function clearCreditCustomer(){
+  clearTimeout(custTimer); custQuerySeq++;
+  chosenCustomer = null;
+  document.getElementById('custChosen').classList.add('hide');
+  document.getElementById('custResults').classList.add('hide');
+  const input = document.getElementById('custSearch');
+  input.value = ''; input.focus();
+}
+async function searchCreditCustomer(q, seq, selectExact){
+  if(!q){ document.getElementById('custResults').classList.add('hide'); return; }
+  const j = await api('/api/customers?q='+encodeURIComponent(q));
+  if(seq !== custQuerySeq || document.getElementById('custSearch').value.trim() !== q) return;
+  const box = document.getElementById('custResults');
+  box.innerHTML = '';
+  if(!j.ok || !j.customers.length){
+    box.classList.add('hide');
+    if(selectExact) toast('رمز الزبون غير موجود؛ تحقّق منه', 'err');
+    return;
+  }
+  if(selectExact && q.startsWith('#') && j.customers.length===1){ selectCreditCustomer(j.customers[0]); return; }
+  j.customers.forEach(c=>{
+    const b = document.createElement('button');
+    b.type = 'button';
+    const label = document.createElement('b'); label.textContent = c.name + ' · ';
+    const code = document.createElement('bdi'); code.dir='ltr'; code.textContent = c.code;
+    label.appendChild(code);
+    const detail = document.createElement('span'); detail.className = 'pr';
+    detail.textContent = ' — الرصيد الحالي ' + money(c.balance_cents) + (c.phone? ' • '+c.phone : '');
+    b.append(label, detail);
+    b.onclick = ()=>selectCreditCustomer(c);
+    box.appendChild(b);
+  });
+  box.classList.remove('hide');
+}
+document.getElementById('custSearch').addEventListener('input', e=>{
+  clearTimeout(custTimer);
+  // لا تسمح ببقاء الزبون القديم محدداً بعد تعديل رمز البحث.
+  chosenCustomer = null;
+  document.getElementById('custChosen').classList.add('hide');
+  const q = e.target.value.trim();
+  const seq = ++custQuerySeq;
+  custTimer = setTimeout(()=>searchCreditCustomer(q, seq, false), q.startsWith('#')? 0 : 200);
+});
+document.getElementById('custSearch').addEventListener('keydown', e=>{
+  if(e.key !== 'Enter') return;
+  e.preventDefault();
+  clearTimeout(custTimer);
+  const q = e.target.value.trim();
+  if(q.startsWith('#')) searchCreditCustomer(q, ++custQuerySeq, true);
+  else searchCreditCustomer(q, ++custQuerySeq, false);
+});
+function showNewCust(){ document.getElementById('newCustBox').classList.toggle('hide'); }
+async function createCust(){
+  const name = document.getElementById('newCustName').value.trim();
+  if(!name){ toast('اكتب اسم الزبون','err'); return; }
+  const phone = document.getElementById('newCustPhone').value.trim();
+  const btn = document.getElementById('newCustSave');
+  if(btn.disabled) return;
+  btn.disabled = true;
+  try {
+    const j = await api('/api/customers', {name, phone});
+    if(!j.ok || !j.customer){ toast(j.error||'تعذّرت إضافة الزبون','err'); return; }
+    clearTimeout(custTimer); custQuerySeq++;
+    selectCreditCustomer(j.customer); // الهوية الدقيقة للزبون المُنشأ، لا أول نتيجة تحمل اسمه.
+    document.getElementById('newCustBox').classList.add('hide');
+    toast('تمت إضافة الزبون واختياره: '+j.customer.code, 'ok');
+  } catch(e) { toast('تعذّر الاتصال؛ أعد المحاولة بعد التحقق', 'err'); }
+  finally { btn.disabled = false; }
+}
+document.getElementById('creditConfirm').onclick = async ()=>{
+  if(!chosenCustomer){ beep(false); toast('اختر الزبون أولاً','err'); return; }
+  const total = Math.max(0, cartTotal()-discount);
+  const nc = nonCashParts('ncb');
+  const paid = Math.min(cents(document.getElementById('creditPaid').value), Math.max(0, total - nonCashSum('ncb')));
+  await submitSale({payment_type:'credit', customer_id: chosenCustomer.id,
+                    paid_cents: paid, discount_cents: discount, non_cash: nc});
+};
+
+/* ================= إغلاق نافذة النجاح (قرار المستشار) =================
+   العامل في الزحمة لا يجب أن يُلزم بضغطة إضافية بعد كل فاتورة — لكنه أيضاً
+   يحتاج ثوانيَ للطباعة أو عرض الفاتورة. الحل: عدّ تنازلي 6 ثوانٍ تُغلق النافذة
+   تلقائياً وتعيد المؤشر لحقل الباركود (البيعة التالية بلا أي لمسة)،
+   وأي لمسة داخل النافذة تُلغي العدّ فتبقى مفتوحةً حتى يفرغ العامل. */
+let doneTimer = null, doneLeft = 0;
+function startDoneCountdown(){
+  stopDoneCountdown();
+  doneLeft = 6;
+  paintDoneHint();
+  doneTimer = setInterval(()=>{
+    doneLeft--;
+    if(doneLeft <= 0){
+      stopDoneCountdown();
+      closeModal('doneModal');
+      const s = document.getElementById('scan'); if(s) s.focus();
+    } else { paintDoneHint(); }
+  }, 1000);
+}
+function paintDoneHint(){
+  const h = document.getElementById('doneHint');
+  if(h) h.textContent = 'تُغلق تلقائياً بعد ' + doneLeft + ' ثوانٍ — أو المس أي زر لتبقى';
+}
+function stopDoneCountdown(){
+  if(doneTimer){ clearInterval(doneTimer); doneTimer = null; }
+  const h = document.getElementById('doneHint');
+  if(h) h.textContent = '';
+}
+document.getElementById('doneModal').addEventListener('pointerdown', stopDoneCountdown);
+
+/* ================= إرسال البيع ================= */
+let saleSubmitting = false;
+async function submitSale(extra){
+  if(saleSubmitting) return; // نقرتان أو أمر صوتي أثناء الرد لا ينشئان فاتورتين.
+  if(!cart.length){ toast('السلة فارغة؛ لا توجد فاتورة للحفظ','err'); return; }
+  saleSubmitting = true;
+  const confirmButtons = ['cashConfirm','creditConfirm'].map(id=>document.getElementById(id));
+  confirmButtons.forEach(b=>{ if(b) b.disabled=true; });
+  try {
+    const body = Object.assign({items:cart.map(l=>({product_id:l.id,qty:l.qty}))}, extra);
+    const j = await api('/api/sale', body);
+    if(!j.ok){ beep(false); toast(j.error||'تعذّر حفظ الفاتورة','err'); return; }
+    beep(); vib(80);
+    lastInvoice = j;
+    closeModal('cashModal');
+    closeModal('creditModal');
+    document.getElementById('doneInfo').textContent = 'فاتورة رقم ' + j.number + ' — الإجمالي ' + j.total + ' ' + currency;
+    const ch = document.getElementById('doneChange');
+    if(j.change && cents(j.change)>0){ ch.textContent = 'الباقي للزبون: ' + j.change; ch.style.display=''; }
+    else { ch.textContent=''; }
+    document.getElementById('printLink').href = '/invoice/'+j.invoice_id+'?print=1';
+    document.getElementById('invoiceViewLink').href = '/invoice/'+j.invoice_id;
+    openModal('doneModal');
+    startDoneCountdown();
+    clearCart();
+    scan.focus();
+  } catch(e) {
+    beep(false); toast('تعذّر حفظ الفاتورة؛ لا تضغط تأكيداً ثانياً قبل مراجعة النتيجة','err');
+  } finally {
+    saleSubmitting = false;
+    confirmButtons.forEach(b=>{ if(b) b.disabled=false; });
+  }
+}
+
+/* ================= تعليق واسترجاع ================= */
+document.getElementById('holdBtn').onclick = ()=>{
+  if(!cart.length){ toast('السلة فارغة','err'); return; }
+  heldCart = {lines: JSON.parse(JSON.stringify(cart)), discount};
+  clearCart();
+  toast('تم تعليق الفاتورة — استرجعها بزر ▶','ok');
+};
+document.getElementById('resumeBtn').onclick = ()=>{
+  if(!heldCart){ toast('لا توجد فاتورة معلَّقة','err'); return; }
+  cart = heldCart.lines; discount = heldCart.discount; heldCart = null;
+  renderCart(); toast('تم استرجاع الفاتورة','ok');
+};
+
+/* ================= الخصم ================= */
+document.getElementById('discBtn').onclick = ()=>{
+  document.getElementById('discInput').value = String(Math.round(discount/100));
+  openModal('discModal');
+};
+document.getElementById('discApply').onclick = ()=>{
+  let v = cents(document.getElementById('discInput').value);
+  if(v > cartTotal()) v = cartTotal();
+  discount = Math.max(0, v);
+  renderCart(); closeModal('discModal');
+};
+
+/* ================= قائمة الأصناف ================= */
+document.getElementById('listBtn').onclick = ()=>{
+  openModal('listModal');
+  document.getElementById('listSearch').value='';
+  document.getElementById('listSearch').focus();
+  searchList('');
+};
+document.getElementById('listSearch').addEventListener('input', e=>{ searchList(e.target.value); });
+async function searchList(q){
+  const j = await api('/api/search?q='+encodeURIComponent(q||''));
+  const box = document.getElementById('listResults');
+  if(!j.ok || !j.products.length){ box.innerHTML = '<div class="muted center mt">لا نتائج — اكتب حرفين على الأقل</div>'; return; }
+  box.innerHTML = '';
+  j.products.forEach(p=>{
+    const b = document.createElement('button');
+    b.className='user-btn';
+    const loc = p.loc ? `<span class="loc-chip">📍 ${p.loc}</span> ` : '';
+    b.innerHTML = `<span class="grow"><b>${p.name}</b><div class="muted small">${loc}${money(p.price_cents)} • رصيد ${p.stock} ${p.barcode?'• '+p.barcode:''}</div></span>`;
+    b.onclick = ()=>{ addToCart(p); closeModal('listModal'); };
+    box.appendChild(b);
+  });
+}
+
+/* ================= الكاميرا ================= */
+document.getElementById('camBtn').onclick = ()=> openCameraScanner(code=>{ lookup(code); });
+
+/* ================= اختصارات لوحة المفاتيح ================= */
+document.addEventListener('keydown', e=>{
+  if(e.key==='F1'){ e.preventDefault(); if(cart.length) openCash(); }
+  if(e.key==='F2'){ e.preventDefault(); if(cart.length) openCredit(); }
+  if(e.key==='Escape'){
+    document.querySelectorAll('.modal.open').forEach(m=>m.classList.remove('open'));
+    scan.focus();
+  }
+});
+
+/* جسر الأوامر الصوتية إلى مسودة البيع فقط؛ حفظ الفاتورة يبقى في أزرار تأكيد الدفع أعلاه. */
+window.rafiqVoicePos = {
+  async findProducts(q){
+    if(scan.disabled) throw new Error('الصندوق مغلق؛ افتح الوردية يدوياً قبل البيع.');
+    const j = await api('/api/search?q='+encodeURIComponent(q));
+    if(!j.ok) throw new Error(j.error||'تعذّر البحث عن الصنف');
+    return j.products||[];
+  },
+  quote(){
+    if(scan.disabled) throw new Error('الصندوق مغلق؛ افتح الوردية أولاً.');
+    if(!cart.length) throw new Error('السلة فارغة؛ أضف صنفاً قبل البيع.');
+    return {lines: cart.map(l=>l.name+' × '+l.qty), totalCents: Math.max(0,cartTotal()-discount),
+            discountCents: discount};
+  },
+  async addProduct(p, count){
+    if(scan.disabled || !p || !Number.isInteger(count) || count<1 || count>100){
+      toast('تحقّق من الوردية والصنف والعدد', 'err'); return false;
+    }
+    // نعيد فحص الهوية والسعر والمخزون قبل تعديل المسودة؛ لا نعتمد نتيجة تعرّف قديمة.
+    let current;
+    try {
+      const options = await this.findProducts(p.barcode||p.name);
+      current = options.find(row=>row.id===p.id && row.name===p.name && row.price_cents===p.price_cents);
+    } catch(e) { toast('تعذّر فحص الصنف من جديد', 'err'); return false; }
+    if(!current){ toast('تغيّر الصنف أو سعره؛ أعد الأمر بعد المراجعة', 'err'); return false; }
+    const already = cart.find(l=>l.id===p.id);
+    if(!Number.isFinite(Number(current.stock)) || Number(current.stock) < count+(already?already.qty:0)){
+      toast('الكمية المطلوبة تتجاوز الرصيد الحالي؛ لا تُضف إلى السلة', 'err'); return false;
+    }
+    addToCart(current, count); scan.focus(); return true;
+  },
+  checkout(kind, customerQuery){
+    try { this.quote(); } catch(e) { toast(e.message, 'err'); return false; }
+    if(kind==='cash') { openCash(); return true; }
+    if(kind!=='credit') return false;
+    openCredit();
+    if(customerQuery){
+      const input = document.getElementById('custSearch');
+      input.value = customerQuery;
+      const seq = ++custQuerySeq;
+      searchCreditCustomer(customerQuery, seq, customerQuery.startsWith('#'))
+        .catch(()=>toast('تعذّر البحث عن الزبون؛ اختره يدوياً', 'err'));
+    }
+    return true; // اختيار الزبون وتأكيد البيع الآجل لا يتمّان إلا بلمس المستخدم.
+  },
+  lastInvoiceId(){ return lastInvoice ? Number(lastInvoice.invoice_id) : null; }
+};
+
+renderCart();
+setTimeout(()=>scan.focus(), 300);
+</script>
+{% endif %}
+{% endblock %}

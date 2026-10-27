@@ -1,0 +1,33 @@
+{% extends "base.html" %}
+{% block title %}الرخصة{% endblock %}
+{% block wrap %}
+<div class="wrap">
+<div class="card login-card">
+  <div class="center">
+    <div style="font-size:42px">{{ '✅' if ok else '🔒' }}</div>
+    <h2 style="margin:6px 0">{{ 'الرخصة مُفعّلة' if ok else 'تفعيل رفيق' }}</h2>
+    <div class="muted small">{{ reason }}</div>
+  </div>
+
+  {% if name %}
+  <div class="mt"><b>المرخّص له:</b> {{ name }}</div>
+  {% endif %}
+  {% if expires %}
+  <div class="mt"><b>تنتهي في:</b> {{ expires }}</div>
+  {% endif %}
+
+  <div class="mt">
+    <div class="muted small">معرّف جهازك (أرسله إلى المالك لإصدار الرخصة):</div>
+    <div class="mt" style="user-select:all;direction:ltr;font-family:monospace;word-break:break-all;padding:10px;border:1px dashed #999;border-radius:8px">{{ device }}</div>
+  </div>
+
+  <form method="post" action="/license" class="mt">
+    <label class="muted small" for="tok">الصق مفتاح الرخصة:</label>
+    <textarea id="tok" name="token" rows="4" style="width:100%;direction:ltr;font-family:monospace" placeholder="RFQ1...." required></textarea>
+    <button class="btn p lg wide mt" type="submit">تفعيل</button>
+  </form>
+  <div class="hint mt">حتى عند انتهاء الرخصة، يستطيع صاحب المتجر حفظ نسخة مشفّرة من بياناته؛ لا يفتح ذلك البيع.</div>
+  <a class="btn ghost wide mt" href="{{ '/rescue' if u and u.role == 'owner' else '/login' }}">🔐 دخول المالك / إنقاذ نسخة البيانات</a>
+</div>
+</div>
+{% endblock %}

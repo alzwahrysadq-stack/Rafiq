@@ -1,0 +1,21 @@
+{% extends "base.html" %}
+{% block title %}تأمين الحسابات{% endblock %}
+{% block wrap %}
+<div class="wrap">
+  {% set msgs = get_flashed_messages(with_categories=true) %}
+  {% for cat, m in msgs %}<div class="flash {{ cat }}">{{ m }}</div>{% endfor %}
+  <div class="card login-card mt">
+    <div class="h1">🔐 تأمين المتجر قبل أول بيع</div>
+    <p>رموز النسخة التجريبية معروفة. اختر الآن رمزاً جديداً لحساب المالك؛ لا يبدأ البيع في إصدار النشر قبل هذه الخطوة.</p>
+    <form method="post" action="/setup">
+      <label for="setupPin">رمز المالك الجديد — أربعة أرقام غير تجريبية</label>
+      <input id="setupPin" name="new_pin" type="password" inputmode="numeric" pattern="[0-9]{4}" minlength="4" maxlength="4" autocomplete="new-password" required>
+      <label for="setupConfirm">تأكيد الرمز الجديد</label>
+      <input id="setupConfirm" name="confirm_pin" type="password" inputmode="numeric" pattern="[0-9]{4}" minlength="4" maxlength="4" autocomplete="new-password" required>
+      <div class="hint mt">ستُوقَف الحسابات التي لا تزال تستعمل الرموز الافتراضية. بعد الدخول، غيّر رمز أي عامل موقوف من الإعدادات لتفعيله، أو أضف عمالاً جدداً. لا تشارك رمزك مع أحد.</div>
+      <button class="btn p lg wide mt" type="submit">حفظ الرمز وتأمين الحسابات</button>
+    </form>
+    <a class="btn ghost wide mt" href="/logout">خروج</a>
+  </div>
+</div>
+{% endblock %}

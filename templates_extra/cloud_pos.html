@@ -1,0 +1,49 @@
+{% extends "base.html" %}
+{% block title %}البيع المتصل{% endblock %}
+{% block content %}
+<div id="cloudPos" data-local-uid="{{ u.id }}" data-local-role="{{ u.role }}">
+  <div class="h1">🛒 شاشة البيع الأصلية — دفتر المتجر الخادمي</div>
+  <p class="hint">توقّف البيع والآجل من الشاشة المحلية. لا تُسجَّل فواتير هنا في Room؛ يجب تثبيت ترقية SQL الاختبارية ثم اعتماد جهاز العامل وورديته. أرشيف الهاتفين مستقل.</p>
+  <div id="cloudLedgerMessage" class="flash error" role="status" aria-live="polite">افتح الصندوق للدخول إلى حساب المتجر.</div>
+  <p id="cloudPosSession" class="small muted"></p>
+  <div id="cloudPosLocked" class="card mt">لا توجد جلسة بيع موثوقة. <a href="{{ url_for('cash') }}">افتح الصندوق وسجّل دخول المتجر، ثم اطلب اعتماد الوردية</a>.</div>
+  <div id="cloudPosWorker" hidden>
+    <div class="card tight mt">
+      <div class="h2">الصنف من مخزون الخادم</div>
+      <p class="small muted">باركود/اسم أو كاميرا الهاتف؛ السعر والمخزون يُفحصان ثانية على الخادم وقت الحفظ. إذا تغيّرا لا تُحفظ الفاتورة: حدّث الأصناف وراجع السلة من جديد.</p>
+      <button id="cloudSaleReload" type="button" class="btn sm ghost">تحديث الأصناف والأسعار من الخادم</button>
+      <div class="row wrap">
+        <input id="cloudSaleSearch" class="grow" placeholder="ابحث عن صنف أو امسح باركوداً" autocomplete="off">
+        <button id="cloudSaleCamera" type="button" class="btn sm ghost">📷 مسح</button>
+      </div>
+      <label for="cloudSaleProduct">اختر الوجه الصحيح والسعر</label>
+      <select id="cloudSaleProduct"><option value="">لا أصناف محمّلة بعد</option></select>
+      <label for="cloudSaleQty">الكمية بالحبة (حتى 3 منازل عشرية)</label>
+      <input id="cloudSaleQty" inputmode="decimal" value="1">
+      <button id="cloudSaleAdd" type="button" class="btn blue wide mt">أضف إلى السلة للمراجعة</button>
+    </div>
+    <div class="card mt">
+      <div class="h2">السلة — مسودة لا تحفظ مالاً</div>
+      <div id="cloudSaleCart" class="ledger"></div>
+      <p id="cloudSaleTotal" class="h2">الإجمالي: —</p>
+    </div>
+    <form id="cloudSaleForm" class="card mt">
+      <div class="h2">مراجعة الدفع ثم تأكيد بيدك</div>
+      <label for="cloudSalePaid">النقد المقبوض الآن بالريال اليمني (اكتب 0 للآجل الكامل)</label>
+      <input id="cloudSalePaid" inputmode="decimal" placeholder="المبلغ الفعلي؛ لا يُفترض 0" required>
+      <label for="cloudSaleCustomer">الزبون — مطلوب فقط إذا بقي دين</label>
+      <select id="cloudSaleCustomer"><option value="">بلا زبون عند السداد النقدي الكامل</option></select>
+      <p id="cloudSaleDue" class="hint">الباقي بالدين: —</p>
+      <p class="small muted">بيع البضاعة بالدين ينشئ فاتورة ويخصم المخزون ولا يصرف أي نقد. السلفة النقدية منفصلة في شاشة الزبائن وللمالك فقط في هذه التجربة.</p>
+      <p class="small muted">لا يرسل هذا الإصدار SMS تلقائياً؛ موافقة الزبون على SMS وإذن الشريحة والإرسال مسار مستقل لم يُختبر على هاتف.</p>
+      <button id="cloudSaleSubmit" class="btn p wide" type="submit" disabled>تأكيد الفاتورة الخادمية</button>
+    </form>
+    <div id="cloudSaleReceipt" class="card mt" hidden></div>
+  </div>
+</div>
+{% endblock %}
+{% block scripts %}
+<script src="cloud-shift.js"></script>
+<script src="cloud-ledger.js"></script>
+<script>window.RafiqCloudLedger.mount('pos');</script>
+{% endblock %}

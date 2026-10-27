@@ -1,0 +1,60 @@
+{% extends "base.html" %}
+{% block title %}زبائن المتجر المتصل{% endblock %}
+{% block content %}
+<div id="cloudCustomers" data-local-uid="{{ u.id }}" data-local-role="{{ u.role }}">
+  <div class="h1">📒 الزبائن وكشف الدين — من الخادم فقط</div>
+  <p class="hint">الزبائن الجدد وأرصدة المتجر هنا منفصلون عن أرصدة Room على الهاتفين. لا نقل آلي، ولا توزيع افتراضي للدفعات على فواتير أو سلف بعينها.</p>
+  <div id="cloudLedgerMessage" class="flash error" role="status" aria-live="polite">سجّل دخول المتجر من الصندوق أولاً.</div>
+  <div id="cloudCustomersLocked" class="card mt"><a href="{{ url_for('cash') }}">افتح الصندوق وسجّل دخول حساب المتجر</a>.</div>
+  <div id="cloudCustomersActive" hidden>
+    <div class="sum1 mt">الرصيد الإجمالي لزبائن المتجر الخادمي: <b id="cloudAllDebts">—</b></div>
+    <p id="cloudCustomersCount" class="small muted"></p>
+    <form id="cloudCustomerForm" class="card mt">
+      <div class="h2">زبون جديد في الخادم (دون نقل دين الهاتف)</div>
+      <label for="cloudCustomerName">اسم الزبون</label><input id="cloudCustomerName" maxlength="120" required>
+      <label for="cloudCustomerPhone">الهاتف اختياري؛ لا يعني موافقة SMS</label><input id="cloudCustomerPhone" inputmode="tel" maxlength="30">
+      <button id="cloudCustomerSubmit" type="submit" class="btn blue wide mt">إضافة الزبون للخادم</button>
+    </form>
+    <div class="card mt">
+      <div class="h2">كشف زبون من الخادم</div>
+      <label for="cloudSelectedCustomer">اختر الزبون</label>
+      <select id="cloudSelectedCustomer"><option value="">— اختر زبوناً —</option></select>
+      <p id="cloudCustomerBalance" class="h2">الرصيد: —</p>
+      <div id="cloudCustomerEntries" class="ledger"></div>
+      <p class="small muted">مبلغ التحصيل يخفض الرصيد العام فقط؛ لم نتفق على توزيعه على دين فاتورة أو سلفة معيّنة.</p>
+    </div>
+    <form id="cloudCollectionForm" class="card mt">
+      <div class="h2">✔ تحصيل نقدي من الزبون</div>
+      <p class="small muted">العامل: يحتاج ورديته الخادمية المفتوحة. لا تحصيل من هاتف المالك دون وردية صرف/قبض محددة.</p>
+      <label for="cloudCollectionAmount">المبلغ المقبوض فعلياً</label><input id="cloudCollectionAmount" inputmode="decimal" required>
+      <button id="cloudCollectionSubmit" type="submit" class="btn p wide">تأكيد التحصيل وزيادة الصندوق</button>
+    </form>
+    <form id="cloudOwnerDebtForm" class="card mt" hidden>
+      <div class="h2">أدخل ديناً يدوياً — المالك فقط</div>
+      <p class="small muted">لا فاتورة، لا بضاعة، ولا نقد من الصندوق. دوّن السبب للتحقق؛ السلفة النقدية في الصندوق إجراء مختلف أدناه.</p>
+      <label for="cloudOwnerDebtAmount">مبلغ الدين</label><input id="cloudOwnerDebtAmount" inputmode="decimal" required>
+      <label for="cloudOwnerDebtReason">السبب (3 أحرف على الأقل)</label><input id="cloudOwnerDebtReason" maxlength="200" required>
+      <button id="cloudOwnerDebtSubmit" type="submit" class="btn amber wide">تأكيد دين يدوي بلا صرف نقدي</button>
+    </form>
+    <form id="cloudAdvanceForm" class="card mt" hidden>
+      <div class="h2">− سلفة نقدية للزبون — المالك فقط</div>
+      <p class="flash error">تجربة آمنة: تصرف نقداً من وردية عامل مفتوحة مع اعتماد المالك على الخادم؛ ينقص الصندوق ويزيد دين الزبون بالقيمة نفسها. العامل لا يستطيع صرفها وحده؛ سياسة تفويضه وحدوده لم تُحسم.</p>
+      <label for="cloudAdvanceShift">اختر الوردية التي سيخرج النقد من درجها</label><select id="cloudAdvanceShift"><option value="">— لا وردية —</option></select>
+      <label for="cloudAdvanceAmount">النقد المصروف فعلياً (ريال يمني)</label><input id="cloudAdvanceAmount" inputmode="decimal" required>
+      <label for="cloudAdvanceReason">سبب السلفة (3 أحرف على الأقل)</label><input id="cloudAdvanceReason" maxlength="200" required>
+      <button id="cloudAdvanceSubmit" type="submit" class="btn amber wide">راجع ثم أكّد صرف سلفة نقدية</button>
+    </form>
+    <div class="card mt"><div class="h2">زبائن المتجر الجديد</div><div id="cloudCustomerList" class="ledger"></div></div>
+  </div>
+  <div class="card mt">
+    <div class="h2">أرشيف ديون هذا الهاتف فقط</div>
+    <p class="small muted">للقراءة دون نسخ تلقائي. أرشيف هاتف المالك لا يُضاف إلى عهدة العامل أو كشف المتجر المتصل.</p>
+    <a href="/archive/customers" class="btn ghost">فتح دفتر الهاتف القديم للقراءة فقط</a>
+  </div>
+</div>
+{% endblock %}
+{% block scripts %}
+<script src="cloud-shift.js"></script>
+<script src="cloud-ledger.js"></script>
+<script>window.RafiqCloudLedger.mount('customers');</script>
+{% endblock %}

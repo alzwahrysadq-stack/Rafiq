@@ -1,0 +1,152 @@
+{% extends "base.html" %}
+{% block title %}لوحة المالك{% endblock %}
+
+{% block content %}
+<div class="row">
+  <div class="h1 grow">لوحة صاحب المتجر</div>
+  <div class="pill b">{{ today }}</div>
+</div>
+
+{% if not shift %}
+<div class="flash error mt">الصندوق مغلق — افتح وردية جديدة من صفحة <a href="{{ url_for('cash') }}">الصندوق</a> حتى تُسجَّل المبيعات.</div>
+{% else %}
+<div class="card tight mt row">
+  <span class="pill g">الوردية مفتوحة</span>
+  <span class="small muted">منذ {{ shift.opened_at | slice(11, 16) }}</span>
+  <div class="grow"></div>
+  <span class="small">صندوق الدرج الآن: <b>{{ expected|money }} {{ S.currency }}</b></span>
+</div>
+{% endif %}
+
+<div class="grid g4 mt">
+  <div class="stat green" data-go="/reports"><div class="lbl">مبيعات اليوم</div><div class="val">{{ stats.sales_today.t|money }}</div>
+    <div class="sub">{{ stats.sales_today.c }} فاتورة — {{ S.currency }}</div></div>
+  <div class="stat blue" data-go="/cash"><div class="lbl">نقد البيع والتحصيل والدخل اليوم</div>
+    <div class="val">{{ (stats.cash_sales + stats.collections + stats.income_today)|money }}</div>
+    <div class="sub">صافي بيع/إلغاء {{ stats.cash_sales|money }} + تحصيل {{ stats.collections|money }} + دخل {{ stats.income_today|money }}</div></div>
+  <div class="stat amber" data-go="/customers"><div class="lbl">آجل جديد اليوم</div><div class="val">{{ stats.new_debt|money }}</div>
+    <div class="sub">ديون الزبائن المتبقية كلها: {{ stats.debts_total|money }}</div></div>
+  <div class="stat {{ 'red' if stats.low_stock else '' }}" data-go="/products"><div class="lbl">أصناف قاربت على النفاد</div>
+    <div class="val">{{ stats.low_stock }}</div><div class="sub">من أصل {{ stats.products }} صنف</div></div>
+  <div class="stat amber" data-go="/suppliers"><div class="lbl">علينا للموردين والمناديب</div>
+    <div class="val">{{ stats.supplier_debt|money }}</div>
+    <div class="sub">متوقعون اليوم: {{ stats.due_delegates }} مندوباً</div></div>
+</div>
+
+<div class="card mt">
+  <div class="row wrap" style="gap:8px">
+    <div class="h2 grow">⏳ تنبيه صلاحية الأصناف</div>
+    <a class="small" href="/products?expiry_alert=1">عرض القائمة ›</a>
+  </div>
+  <div class="small muted mt">انتهت صلاحيتها: <b>{{ expiry_expired }}</b> • ستنتهي خلال {{ expiry_days }} يوماً (من اليوم): <b>{{ expiry_near }}</b>. يُعرض التنبيه عند فتح اللوحة فقط.</div>
+  {% if expiry_rows %}
+  <div class="ledger mt">
+    {% for p in expiry_rows %}
+    <div class="rowline">
+      <span class="who"><span class="nm"><a href="{{ url_for('product_edit', pid=p.id) }}">{{ p.name }}</a></span>
+        <span class="sub">{{ p.expiry }} • رصيد {{ p.stock }}</span></span>
+      <span class="pill {{ 'r' if p.expired else 'a' }}">{{ 'منتهٍ' if p.expired else 'قريب' }}</span>
+    </div>
+    {% endfor %}
+  </div>
+  {% if expiry_total > (expiry_rows|length) %}<div class="muted small mt">و{{ expiry_total - (expiry_rows|length) }} أصناف أخرى في القائمة.</div>{% endif %}
+  {% else %}<div class="muted small mt">لا توجد أصناف منتهية أو قريبة بتاريخ مسجّل ورصيد موجب.</div>{% endif %}
+  <div class="hint mt">هذا تنبيه من تاريخ واحد للصنف، وليس تتبّعاً لصلاحية كل دفعة مخزون أو إشعاراً خارج التطبيق.</div>
+</div>
+
+<div class="card mt">
+  <div class="row wrap" style="gap:8px">
+    <div class="h2 grow">📒 ديون تحتاج متابعة: {{ debt_followup_count }}</div>
+    <a class="small" href="/customers?followup=1">عرض القائمة ›</a>
+  </div>
+  <div class="muted small mt">المعيار: مرّ {{ debt_followup_days }} يوماً أو أكثر على أقدم مبلغ لم تُغطِّه الدفعات، مع احتساب السداد للأقدم أولاً.</div>
+  {% if debt_followup_rows %}
+  <div class="ledger mt">
+    {% for d in debt_followup_rows %}
+    <div class="rowline">
+      <span class="who"><span class="nm"><a href="{{ url_for('customer_detail', cid=d.id) }}">{{ d.name }}</a></span>
+        <span class="sub">أقدم مبلغ متبقٍّ: {{ d.oldest }} • منذ {{ d.age_days }} يوماً</span></span>
+      <span class="amt">{{ d.balance_cents|money }} {{ S.currency }}</span>
+    </div>
+    {% endfor %}
+  </div>
+  {% if debt_followup_count > (debt_followup_rows|length) %}<div class="muted small mt">و{{ debt_followup_count - (debt_followup_rows|length) }} آخرون في القائمة.</div>{% endif %}
+  {% else %}<div class="muted small mt">لا ديون تستوفي معيار المتابعة الآن.</div>{% endif %}
+  <div class="hint mt">ليس حكماً بالتعثر أو استحقاقاً تعاقدياً: لا يُسجَّل موعد سداد محدد؛ الدين المرحّل يؤرَّخ حالياً بإنشاء حساب الزبون.</div>
+</div>
+
+<div class="card mt">
+  <div class="row">
+    <div class="h2 grow">🚚 الموردون والمناديب اليوم</div>
+    <a class="small" href="{{ url_for('suppliers') }}">عرض الكل ›</a>
+  </div>
+  {% if stats.due_total %}
+  <div class="muted small">متوقع اليوم <b>{{ stats.due_total }}</b>{% if stats.late_total %} • منهم متأخر <b style="color:#b45309">{{ stats.late_total }}</b>{% endif %} — علّم «مرّ اليوم» عند مجيئهم.</div>
+  <div class="ledger mt">
+    {% for s in due_list %}
+    <div class="rowline">
+      <span class="avc {{ 'r' if s.overdue else '' }}">{{ s.name[0] }}</span>
+      <span class="who">
+        <span class="nm"><a href="{{ url_for('supplier_detail', sid=s.id) }}" style="color:inherit">{{ s.name }}</a></span>
+        <span class="sub">{% if s.overdue %}<span class="chipb r">متأخر</span> • {% endif %}<span class="chipb">{{ PL.get(s.periodicity, s.periodicity) }}</span>
+          • {% if s.days == null %}لم يمر بعد{% else %}<span style="white-space:nowrap">{{ s.days }} يوم</span>{% endif %}
+          {% if s.goods %} • {{ s.goods }}{% endif %}</span>
+      </span>
+      <span class="amt" style="display:flex; gap:6px; flex-direction:column">
+        {% if s.phone %}<button type="button" class="btn sm ghost nowrap" style="min-width:92px; color:#128c7e"
+          data-phone="{{ s.phone }}" data-name="{{ s.name }}" data-goods="{{ s.goods }}"
+          onclick="waRemind(this, event)">📲 تذكير</button>{% endif %}
+        <a class="btn sm p nowrap" style="min-width:92px" href="{{ url_for('suppliers') }}">✔ مرّ اليوم</a>
+      </span>
+    </div>
+    {% endfor %}
+  </div>
+  {% if due_more %}<div class="center muted small mt">و{{ due_more }} غيرهم — <a href="{{ url_for('suppliers') }}">اعرض القائمة</a></div>{% endif %}
+  {% else %}
+  <div class="center muted" style="padding:10px">لا أحد متوقع اليوم وفق الدوريات ✔</div>
+  {% endif %}
+</div>
+
+<div class="card mt">
+  <div class="h2">اختصارات سريعة</div>
+  <div class="btn-grid mt">
+    <a class="btn blue" href="/cloud/pilot">☁️ واجهة الاختبار السحابي المنفصلة</a>
+    <a class="btn p" href="{{ url_for('pos') }}">🛒 شاشة البيع</a>
+    <a class="btn blue" href="{{ url_for('reports') }}">📊 تقرير اليوم</a>
+    <a class="btn blue" href="{{ url_for('reports') }}">🏆 الأكثر بيعاً اليوم</a>
+    <a class="btn amber" href="{{ url_for('customers') }}">💰 ديون الزبائن</a>
+    <a class="btn amber" href="{{ url_for('suppliers') }}">🚚 الموردون والمناديب</a>
+    <a class="btn ghost" href="{{ url_for('cash') }}">🧾 الصندوق</a>
+    <a class="btn ghost" href="{{ url_for('products', q='') }}">📦 الأصناف</a>
+    <a class="btn ghost" href="{{ url_for('imports') }}">⬆️ أصناف الأمين · خطة PDF كناش</a>
+    <a class="btn ghost" href="{{ url_for('reports') }}">📈 فواتير اليوم وإلغاؤها</a>
+    <a class="btn ghost" href="{{ url_for('settings') }}">⚙️ الإعدادات والعاملون</a>
+  </div>
+</div>
+
+<div class="card">
+  <div class="h2">«العين عن بعد» — ما تراه الآن</div>
+  <div class="muted small mt">
+    هذه اللوحة هي نواة فكرة «تعيش كأنك وسط عامليك»: مبيعات اللحظة، من باع وبكم، دخل الدرج، والديون.
+    قوائم الصلاحية ومتابعة الديون محلية على هاتف البيع؛ لم تُفعّل بعد مرآة Supabase للمالك أو إشعارات الهاتف خارج التطبيق.
+  </div>
+</div>
+{% endblock %}
+{% block scripts %}
+<script>
+/* البطاقات التي تحمل data-go تفتح النافذة المقصودة عبر رابط داخلي يلتقطه المحرّك */
+document.querySelectorAll('.stat[data-go]').forEach(function(el){
+  el.style.cursor = 'pointer';
+  el.addEventListener('click', function(){
+    var a = document.createElement('a'); a.href = el.getAttribute('data-go');
+    document.body.appendChild(a); a.click(); a.remove();
+  });
+});
+const SUP_MSG = "مرحباً {name} 👋\nنحن " + {{ S.store_name|tojson }} + " — حان موعد توريد {goods}.\nنرجو المرور اليوم، شكراً لك 🌹";
+function waRemind(btn, ev){
+  ev.preventDefault(); ev.stopPropagation();
+  const d = btn.dataset;
+  waOpen(d.phone, SUP_MSG.replace('{name}', d.name || '').replace('{goods}', (d.goods || 'البضاعة')));
+}
+</script>
+{% endblock %}

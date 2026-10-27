@@ -1,0 +1,24 @@
+{% extends "base.html" %}
+{% block title %}العين عن بُعد{% endblock %}
+{% block content %}
+<div id="cloudEye" data-local-uid="{{ u.id }}" data-local-role="{{ u.role }}">
+  <div class="h1">👁️ العين عن بُعد — سجل المالك</div>
+  <p class="hint">صفحة مستقلة للمالك تسحب أحدث حركات المتجر من الخادم. تُظهر الحدث الموثّق، لكنها ليست Push خلفية ولا إثباتاً لوصول إشعار الهاتف بنغمة.</p>
+  <div id="cloudLedgerMessage" class="flash error" role="status" aria-live="polite">ادخل حساب المالك الخادمي من الصندوق أولاً.</div>
+  <div id="cloudEyeLocked" class="card mt"><a href="/cash">دخول حساب المتجر من الصندوق</a>.</div>
+  <div id="cloudEyeActive" hidden>
+    <div class="row wrap">
+      <button id="cloudEyeRefresh" class="btn sm ghost" type="button">تحديث أحداث الخادم</button>
+      <button id="cloudEyeSound" class="btn sm ghost" type="button">تفعيل نغمة المالك أثناء فتح التطبيق فقط</button>
+    </div>
+    <p class="small muted">النغمة بعد لمس الزر وأثناء ظهور الصندوق أو اللوحة أو العين (وبعد تفعيلها أيضاً عند فتح الزبائن). لا تعتمد عليها كتنبيه للمالك إذا أغلق الهاتف أو خرج من التطبيق؛ Push يحتاج خدمة موثوقة وإذناً واختباراً منفصلاً.</p>
+    <div id="cloudEyeStats" class="grid g4 mt"></div>
+    <div id="cloudEyeEvents" class="ledger mt"></div>
+  </div>
+</div>
+{% endblock %}
+{% block scripts %}
+<script src="cloud-shift.js"></script>
+<script src="cloud-ledger.js"></script>
+<script>window.RafiqCloudLedger.mount('eye');</script>
+{% endblock %}

@@ -1,0 +1,159 @@
+{% extends "base.html" %}
+{% block title %}كشف حساب {{ c.name }}{% endblock %}
+{% block bodyclass %}pad-b{% endblock %}
+{% block content %}
+
+<!-- ترويسة كناشية: رجوع › الاسم › واتساب -->
+<div class="row mt">
+  <a class="btn sm ghost" href="{% if cloud_shift_only %}/archive/customers{% else %}{{ url_for('customers') }}{% endif %}">‹ رجوع</a>
+  <div class="grow center">
+    <div class="h2" style="margin:0">{{ c.name }}</div>
+    <div class="muted small">رمز الآجل <b dir="ltr">{{ c.code }}</b></div>
+    {% if c.phone %}<div class="muted small" style="direction:ltr">{{ c.phone }}</div>{% endif %}
+  </div>
+  {% if c.phone %}<a class="btn sm" style="background:#d9f2e4;color:#0f5c46" href="#waBox">💬</a>
+  {% else %}<span style="width:44px"></span>{% endif %}
+</div>
+
+{% if not audit_ok %}<div class="hint mt" style="color:#b91c1c;font-weight:800">⚠ اختلاف بين مجموع الحركات والرصيد. لا تعتمد الكشف حتى تُراجع البيانات؛ لم نغيّر أي رصيد تلقائياً.</div>{% endif %}
+<!-- الرصيد الكبير -->
+<div class="card center mt" style="padding:16px">
+  <div class="muted small">الرصيد الحالي</div>
+  <div style="font-size:2.1rem; font-weight:800; color:{{ '#b91c1c' if c.balance_cents>0 else '#17795e' }}">
+    {{ c.balance_cents|money }} {{ S.currency }}
+  </div>
+  <div class="small">
+    {% if c.balance_cents > 0 %}<span class="chipb r">أعطيت — عليه دين</span>
+    {% elif c.balance_cents < 0 %}<span class="chipb g">رصيد لصالح الزبون (قد يكون افتتاحياً)</span>
+    {% else %}<span class="chipb g">مسدَّد بالكامل ✔</span>{% endif %}
+  </div>
+</div>
+
+<div class="opts mt">
+  <a class="btn ghost" href="#waBox">📲 إرسال تذكير واتساب</a>
+  <a class="btn ghost" href="#history">📄 كشف المعاملات</a>
+    <a class="btn ghost" href="{% if cloud_shift_only %}/archive/customers/{{ c.id }}/print{% else %}/customers/{{ c.id }}/print{% endif %}">🖨 طباعة كشف الحساب</a>
+</div>
+
+<!-- سجل المعاملات بالأسلوب الكناشي -->
+<div class="row mt" id="history" style="margin-top:16px">
+  <div class="h2 grow">المعاملات <span class="chipb">{{ ev|length }}</span></div>
+</div>
+<div class="ledger mt">
+  {% for e in ev %}
+    <div class="rowline">
+      <span class="circ {{ 'dn' if e.kind=='taken' or e.kind=='credit_opening' else 'up' }}">{{ '↓' if e.kind=='taken' or e.kind=='credit_opening' else '↑' }}</span>
+      <span class="who">
+        <span class="nm">
+          {% if e.invoice_id %}<a href="{{ url_for('invoice', iid=e.invoice_id) }}">{{ e.note }}</a>
+          {% else %}{{ e.note }}{% endif %}
+        </span>
+        <span class="sub">{% set stampStart = e.ts | slice(0, 4) %}{% if stampStart == '0001' %}قبل بدء النظام{% else %}{{ e.ts | slice(0, 16) }}{% endif %}
+          {% if e.user %} • {{ e.user }}{% endif %}
+          • <span class="chipb {{ 'g' if e.balance_after<=0 else 'r' }}">الرصيد {{ e.balance_after|money }}</span>
+        </span>
+      </span>
+      <span class="amt">
+        <div class="a {{ 'g' if e.kind=='taken' or e.kind=='credit_opening' else 'r' }}">{{ e.amount|money }}</div>
+        <div class="t">{{ 'افتتاحي لصالحه' if e.kind=='credit_opening' else ('أخذت' if e.kind=='taken' else 'أعطيت') }}</div>
+      </span>
+    </div>
+  {% endfor %}
+  {% if not ev %}<div class="center muted" style="padding:22px">لا معاملات بعد</div>{% endif %}
+</div>
+
+<!-- فواتيره التفصيلية -->
+{% if invoices %}
+<div class="card mt">
+  <div class="h2">آخر 200 فاتورة (الكشف أعلاه يشمل الحركات كلها)</div>
+  <div class="scroll-x">
+  <table class="tbl">
+    <tr><th>رقم</th><th>التاريخ</th><th>الإجمالي</th><th>دُفع</th><th>متبقٍ</th><th>الحالة</th></tr>
+    {% for i in invoices %}
+      <tr>
+        <td><a href="{{ url_for('invoice', iid=i.id) }}">{{ i.number }}</a></td>
+        <td class="small">{{ i.created_at | slice(0, 16) }}</td>
+        <td>{{ i.total_cents|money }}</td>
+        <td>{{ i.paid_cents|money }}</td>
+        <td><b style="color:{{ '#b91c1c' if i.due_cents>0 else '#17795e' }}">{{ i.due_cents|money }}</b></td>
+        <td>{% if i.status=='cancelled' %}<span class="pill r">ملغاة</span>
+            {% else %}<span class="pill g">سارية</span>{% endif %}</td>
+      </tr>
+    {% endfor %}
+  </table>
+  </div>
+</div>
+{% endif %}
+
+{% if not cloud_shift_only %}
+<!-- واتساب لبيانات الدفتر المحلي فقط؛ لا يُرسل كشفاً قديماً على أنه خادمي. -->
+<div class="card" id="waBox">
+  <div class="h2">📲 تذكير واتساب</div>
+  <div class="muted small">راجع الرقم والرسالة ثم اضغط الإرسال — الإرسال يبقى بيدك دائماً.</div>
+  <label>رقم الواتساب</label>
+  <input id="waPhone" value="{{ c.phone }}" inputmode="tel">
+  <label>نص الرسالة</label>
+  <textarea id="waText" rows="4">تذكير من {{ S.store_name }}
+{% if c.balance_cents>0 %}الرصيد المتبقي عليكم: {{ c.balance_cents|money }} {{ S.currency }}
+نرجو التكرم بالسداد عند الإمكان، شكراً لكم 🌹{% else %}لا يوجد رصيد مستحق — شكراً لتعاملكم معنا 🌹{% endif %}</textarea>
+  <button class="btn wa-btn wide mt" id="waSend">فتح واتساب بالرسالة</button>
+</div>
+{% endif %}
+
+{% if cloud_shift_only %}
+<div class="flash error mt">كشف هذا الزبون محلي على هذا الهاتف فقط. «أعطيت» القديم لا يخصم سلفة نقدية من الصندوق؛ لا تصرف سلفة ولا تقبض دفعة اعتماداً عليه.</div>
+{% else %}
+<!-- شريط كناش السفلي: أخذت / أعطيت -->
+<div class="bottombar no-print">
+  <div class="in">
+    <button class="bbtn take" onclick="openModal('takeModal')">✔ أخذت</button>
+    <button class="bbtn give" onclick="openModal('giveModal')">✔ أعطيت</button>
+  </div>
+</div>
+
+<!-- نافذة أخذت (قبض دفعة) -->
+<div class="modal" id="takeModal"><div class="sheet">
+  <div class="h2">✔ أخذت من {{ c.name }}</div>
+  <div class="muted small">قبض نقدي يُسجَّل في الصندوق المفتوح تلقائياً.</div>
+  <form method="POST" action="{{ url_for('customer_pay', cid=c.id) }}">
+    <label>المبلغ المقبوض</label>
+    <input name="amount" class="big center" inputmode="decimal" required autofocus placeholder="0">
+    <div class="quick-amts mt" id="q1">
+      {% if c.balance_cents>0 %}<button type="button" class="btn" data-v="{{ (c.balance_cents/100) }}">كامل الدين {{ c.balance_cents|money }}</button>{% endif %}
+    </div>
+    <label>ملاحظة (اختياري)</label><input name="note" placeholder="دفعة نقدية">
+    <div class="btn-grid mt">
+      <button class="btn p lg" style="grid-column:span 2">تسجيل القبض</button>
+      <button type="button" class="btn ghost" style="grid-column:span 2" onclick="closeModal('takeModal')">رجوع</button>
+    </div>
+  </form>
+</div></div>
+
+<!-- نافذة أعطيت (دين يدوي) -->
+<div class="modal" id="giveModal"><div class="sheet">
+  <div class="h2">✔ أعطيت {{ c.name }}</div>
+  <div class="muted small">تسجيل دين جديد بلا فاتورة (بضاعة على الحساب، سلفة…). لا يمسّ الصندوق.</div>
+  <form method="POST" action="{{ url_for('customer_debit', cid=c.id) }}">
+    <label>المبلغ</label>
+    <input name="amount" class="big center" inputmode="decimal" required placeholder="0">
+    <label>البيان</label><input name="note" placeholder="مثال: بضاعة على الحساب">
+    <div class="btn-grid mt">
+      <button class="btn amber lg" style="grid-column:span 2">تسجيل الدين</button>
+      <button type="button" class="btn ghost" style="grid-column:span 2" onclick="closeModal('giveModal')">رجوع</button>
+    </div>
+  </form>
+</div></div>
+{% endif %}
+{% endblock %}
+
+{% block scripts %}
+<script>
+document.querySelectorAll('#q1 .btn').forEach(b=>{
+  b.onclick = ()=>{ document.querySelector('#takeModal input[name=amount]').value = b.dataset.v; };
+});
+var localWaButton = document.getElementById('waSend');
+if (localWaButton) localWaButton.onclick = ()=>{
+  waOpen(document.getElementById('waPhone').value, document.getElementById('waText').value);
+};
+</script>
+{% endblock %}

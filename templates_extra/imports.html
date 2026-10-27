@@ -1,0 +1,261 @@
+{% extends "base.html" %}
+{% block title %}الاستيراد{% endblock %}
+{% block content %}
+<div class="h1">استيراد البيانات</div>
+<div class="muted small mt">راجع الملف كاملاً قبل الحفظ. أصناف الأمين متاحة تجريبياً؛ ديون كناش لا تُرحّل تلقائياً من PDF.</div>
+
+<div class="grid g2 mt">
+  <div class="card">
+    <div class="h2">📦 أصناف الأمين</div>
+    <div class="muted small mt">اختر ملف XLSX أو CSV. تُعرض معاينة فقط قبل تأكيد الحفظ؛ راجع باركود العبوة وسعر البيع والتكلفة والرصيد. الملف بلا كمية يُضيف الجديد برصيد صفر ولا يمس رصيد الموجود؛ لكنه قد يُغيّر أسعاره. <b>لا يوجد حذف جماعي أو تراجع عن الاستيراد: لا تجرّب ملفاً غير موثوق على هاتف فيه بيانات مهمة.</b></div>
+    <form method="POST" action="{{ url_for('imports_upload') }}" enctype="multipart/form-data" class="mt">
+      <input type="hidden" name="kind" value="products">
+      <input type="file" name="file" accept=".csv,.xlsx" required>
+      <button class="btn p wide mt">⬆️ رفع الأصناف ومراجعتها</button>
+    </form>
+    <a class="btn ghost sm mt" href="{{ url_for('import_template', kind='products') }}">⬇️ نموذج أصناف CSV</a>
+  </div>
+
+  <div class="card">
+    <div class="h2">💰 كناش — قراءة PDF على الهاتف</div>
+    <p class="muted small mt">التقرير الأصلي «الوضع حسب العميل» يحتوي طبقة نص. تُقرأ الصفحات ومجاميع «أعطيت/أخذت» والرصيد محلياً بلا شبكة. إذا كان PDF صورة فقط أو اختلفت بنيته فلا نخمن أسماء أو أرقاماً.</p>
+    {% if u and u.role == 'owner' %}
+      <label for="knaashPdf" class="small"><b>اختر تصدير كناش الأصلي PDF:</b></label>
+      <input id="knaashPdf" type="file" accept="application/pdf,.pdf" class="mt">
+      <p id="knaashStatus" class="small muted mt" role="status">لا ملف مفتوح. المعاينة لا تغيّر بيانات الزبائن.</p>
+    {% else %}
+      <div class="hint mt">مراجعة كشف كناش مخصّصة للمالك؛ لا يُنقل أي رصيد من حساب العامل.</div>
+    {% endif %}
+    <div class="hint mt"><b>قراءة فقط — لا يوجد زر ترحيل ديون في هذه النسخة.</b> يوجد في الكشوف أرصدة لصالح بعض الزبائن وأرصدة صفرية. لا تربط الأسماء تلقائياً ولا تدخل الرصيد نفسه يدوياً ثم تستورده. استيراد ديون CSV القديم مُعطّل لحماية الأرصدة.</div>
+  </div>
+</div>
+
+{% if u and u.role == 'owner' %}
+<div class="card mt" id="knaashPreview" style="display:none" aria-live="polite">
+  <div class="h2">تدقيق التقرير — بلا ترحيل</div>
+  <div id="knaashSummary" class="mt small"></div>
+  <div class="hint mt"><b>قبل أي اعتماد لاحق:</b> قارن الاسم والرقم مع PDF لكل صف، واربطه بعميل رفيق بعينه أو أنشئه بعد التأكد من عدم وجود نسخة مكررة. وحدة العملة غير مذكورة صراحة في التقرير؛ تأكد منها. لا تُنقل الحركات والرصيد الافتتاحي معاً، ولا يُرحّل هذا الكشف إلى هاتفين مستقلين بلا مزامنة.</div>
+  <div class="row mt" style="flex-wrap:wrap;gap:6px">
+    <button type="button" class="btn ghost sm" id="knaashAll">كل الصفوف</button>
+    <button type="button" class="btn ghost sm" id="knaashCredits">أرصدة لصالح الزبائن</button>
+    <button type="button" class="btn ghost sm" id="knaashZeros">أرصدة صفرية</button>
+  </div>
+  <div class="mt" style="overflow-x:auto">
+    <table class="tbl" id="knaashTable">
+      <thead><tr><th>الصف / الصفحة</th><th>اسم كناش (تدقيق يدوي)</th><th>الهاتف</th><th>أعطيت</th><th>أخذت</th><th>الرصيد الموقّع</th><th>مراجعة العميل</th></tr></thead>
+      <tbody></tbody>
+    </table>
+  </div>
+  <p id="knaashShown" class="small muted mt"></p>
+  <button type="button" id="knaashMore" class="btn ghost sm" style="display:none">عرض 20 صفاً تالياً</button>
+
+  <div class="hint mt" id="knaashProgress">يمكن حفظ مراجعة الأسماء على هذا الهاتف والعودة إليها لاحقاً. لم تُنقل أي ديون.</div>
+  <div id="knaashOtherFile" class="hint mt" style="display:none">
+    <span id="knaashOtherFileMessage">توجد مراجعة محفوظة لكشف كناش آخر. لن نخلط الملفين.</span>
+    <button type="button" class="btn ghost sm mt" id="knaashClearOld">امسح مراجعة الكشف القديم فقط</button>
+  </div>
+  <div class="card mt" id="knaashReviewPanel" style="display:none">
+    <div class="h2">راجع هذا العميل</div>
+    <p class="small" id="knaashRowTitle"></p>
+    <div class="hint small">قارن الاسم والرصيد مع ملف كناش. لن نختار عميلاً بالاسم وحده، ولن نضيف ديناً الآن.</div>
+    <div class="row mt" style="flex-wrap:wrap;gap:6px">
+      <button type="button" class="btn ghost sm" id="knaashNew">عميل جديد</button>
+      <button type="button" class="btn ghost sm" id="knaashExisting">موجود في رفيق</button>
+      <button type="button" class="btn ghost sm" id="knaashZero" style="display:none">رصيده صفر؛ لا أنقل ديناً</button>
+    </div>
+    <div id="knaashNewFields" class="mt" style="display:none">
+      <label for="knaashNewName">الاسم الصحيح في رفيق</label>
+      <input id="knaashNewName" maxlength="120" autocomplete="off">
+      <label for="knaashNewPhone">رقم الهاتف، إن وجد</label>
+      <input id="knaashNewPhone" maxlength="40" inputmode="tel" autocomplete="off">
+    </div>
+    <div id="knaashExistingFields" class="mt" style="display:none">
+      <label for="knaashSearch">ابحث عن العميل باسمه أو رمزه أو هاتفه</label>
+      <div class="row"><input id="knaashSearch" class="grow" autocomplete="off"><button type="button" class="btn sm" id="knaashFind">ابحث</button></div>
+      <div id="knaashMatches" class="mt"></div>
+      <p id="knaashPicked" class="small mt"></p>
+    </div>
+    <p id="knaashZeroText" class="small mt" style="display:none">سيُحسب هذا العميل ضمن التقرير، لكن لن ننشئ له ديناً.</p>
+    <label class="mt"><input type="checkbox" id="knaashChecked"> قارنت الاسم والرصيد مع كشف كناش وتأكدت من اختياري</label>
+    <div class="row mt" style="gap:6px">
+      <button type="button" class="btn p" id="knaashSave">احفظ مراجعتي لهذا العميل</button>
+      <button type="button" class="btn ghost" id="knaashClose">إغلاق</button>
+    </div>
+    <p id="knaashReviewMsg" class="small mt" role="status"></p>
+  </div>
+</div>
+{% endif %}
+
+<div class="card mt">
+  <div class="h2">سجل عمليات الاستيراد السابقة</div>
+  <table class="tbl">
+    <tr><th>التاريخ</th><th>النوع</th><th>الملف</th><th>جديد</th><th>محدَّث</th><th>أخطاء متجاوَزة</th><th>بواسطة</th></tr>
+    {% for l in logs %}
+      <tr>
+        <td class="small">{{ l.created_at[0:16] }}</td>
+        <td>{{ 'أصناف' if l.kind=='products' else 'ديون سابقة' }}</td>
+        <td class="small">{{ l.filename }}</td>
+        <td>{{ l.added }}</td><td>{{ l.updated }}</td><td>{{ l.errors }}</td>
+        <td class="small">{{ l.uname }}</td>
+      </tr>
+    {% endfor %}
+    {% if not logs %}<tr><td colspan="7" class="center muted">لا عمليات بعد</td></tr>{% endif %}
+  </table>
+</div>
+
+{% if u and u.role == 'owner' %}
+<script src="../knaash/reader.js"></script>
+<script src="../knaash/review_ui.js"></script>
+<script>
+(function () {
+  'use strict';
+  var chooser = document.getElementById('knaashPdf');
+  if (!chooser) return;
+  var status = document.getElementById('knaashStatus');
+  var preview = document.getElementById('knaashPreview');
+  var summary = document.getElementById('knaashSummary');
+  var body = document.querySelector('#knaashTable tbody');
+  var shown = document.getElementById('knaashShown');
+  var more = document.getElementById('knaashMore');
+  var records = [], filter = 'all', count = 0, generation = 0, review = null;
+
+  function money(cents) {
+    var abs = Math.abs(cents), whole = Math.floor(abs / 100);
+    return (cents < 0 ? '−' : '') + String(whole).replace(/\B(?=(\d{3})+(?!\d))/g, ',') +
+      ',' + String(abs % 100).padStart(2, '0');
+  }
+  function message(value, error) {
+    status.textContent = value;
+    status.style.color = error ? '#b91c1c' : '';
+  }
+  function line(label, value) {
+    var item = document.createElement('div');
+    var bold = document.createElement('b');
+    bold.textContent = label + ': ';
+    item.appendChild(bold);
+    item.appendChild(document.createTextNode(value));
+    summary.appendChild(item);
+  }
+  function matching() {
+    return filter === 'all' ? records : records.filter(function (r) { return r.kind === filter; });
+  }
+  function draw() {
+    var items = matching();
+    body.textContent = '';
+    items.slice(0, count).forEach(function (r) {
+      var tr = document.createElement('tr');
+      var signed = (r.kind === 'credit' ? 'لصالح العميل ' : r.kind === 'zero' ? 'صفر ' : 'دين ') + money(r.balanceCents);
+      [r.index + ' / ' + r.page, r.sourceName, r.phone || '—',
+       money(r.givenCents), money(r.takenCents), signed].forEach(function (v, i) {
+        var td = document.createElement('td');
+        td.textContent = v;  // بيانات PDF لا تدخل HTML خاماً
+        if (i === 2) td.dir = 'ltr';
+        if (i === 5 && r.kind === 'credit') td.style.color = '#08755a';
+        tr.appendChild(td);
+      });
+      var action = document.createElement('td');
+      var button = document.createElement('button');
+      button.type = 'button'; button.className = 'btn ghost sm';
+      button.textContent = review ? review.label(r.index) : 'المراجعة غير متاحة';
+      button.disabled = !review || !review.canReview();
+      if (review) button.addEventListener('click', function () { review.open(r); });
+      action.appendChild(button); tr.appendChild(action);
+      body.appendChild(tr);
+    });
+    shown.textContent = 'معروض ' + Math.min(count, items.length) + ' من ' + items.length + ' صفاً. جميع الصفوف مدقّقة حسابياً فقط، لا هوية العملاء.';
+    more.style.display = count < items.length ? '' : 'none';
+  }
+  function choose(which) { filter = which; count = 20; draw(); }
+  document.getElementById('knaashAll').addEventListener('click', function () { choose('all'); });
+  document.getElementById('knaashCredits').addEventListener('click', function () { choose('credit'); });
+  document.getElementById('knaashZeros').addEventListener('click', function () { choose('zero'); });
+  more.addEventListener('click', function () { count += 20; draw(); });
+
+  function read(file) {
+    return new Promise(function (resolve, reject) {
+      var reader = new FileReader();
+      reader.onload = function () { resolve(new Uint8Array(reader.result)); };
+      reader.onerror = function () { reject(new Error('تعذّرت قراءة ملف الهاتف.')); };
+      reader.readAsArrayBuffer(file);
+    });
+  }
+  function sha(bytes) {
+    if (!window.crypto || !crypto.subtle) return Promise.resolve(null);
+    return crypto.subtle.digest('SHA-256', bytes.buffer).then(function (digest) {
+      return Array.from(new Uint8Array(digest)).map(function (b) {
+        return b.toString(16).padStart(2, '0');
+      }).join('');
+    }).catch(function () { return null; });
+  }
+  chooser.addEventListener('change', async function () {
+    var file = chooser.files && chooser.files[0];
+    if (!file) return;
+    var thisRun = ++generation;
+    if (review) review.dispose();
+    records = []; review = null; preview.style.display = 'none'; summary.textContent = '';
+    document.getElementById('knaashReviewPanel').style.display = 'none';
+    document.getElementById('knaashOtherFile').style.display = 'none';
+    message('تجري قراءة الكشف على هذا الهاتف…', false);
+    try {
+      if (file.size > 10 * 1024 * 1024) throw new Error('حجم PDF أكبر من حد الأمان 10 ميغابايت.');
+      var bytes = await read(file);
+      var fingerprint = await sha(bytes); // قبل أن ينقل PDF.js ذاكرة الملف إلى عامل القراءة
+      var pdfjs = await import(new URL('../knaash/pdf.min.js', location.href).href);
+      pdfjs.GlobalWorkerOptions.workerSrc = new URL('../knaash/pdf.worker.min.js', location.href).href;
+      var result = await window.KnaashPdf.inspect(bytes, pdfjs);
+      if (!chooser.isConnected || thisRun !== generation) return;
+      records = result.rows;
+      line('تاريخ التقرير', result.reportDateIso);
+      line('الصفحات / العملاء', result.pageCount + ' / ' + result.sourceCount);
+      line('رمز هذا الملف (لمنع خلط كشوف مختلفة)', fingerprint ? fingerprint.slice(0, 16) + '…' : 'غير متاح على هذا الهاتف');
+      line('أعطيت / أخذت / الصافي الموقّع', money(result.totals.givenCents) + ' / ' +
+        money(result.totals.takenCents) + ' / ' + money(result.totals.netCents));
+      line('ديون لصالح المتجر', result.counts.debt + ' صفاً = ' + money(result.totals.grossDebtCents));
+      line('أرصدة لصالح الزبائن', result.counts.credit + ' صفوف = ' + money(result.totals.grossCreditCents));
+      line('أرصدة صفرية', result.counts.zero + ' صفوف (محسوبة في عدد العملاء، بلا دين)');
+      preview.style.display = '';
+      if (fingerprint && window.RafiqKnaashReview) {
+        var currentReview = window.RafiqKnaashReview.create({
+          root: preview, rows: records, sourceSha256: fingerprint,
+          reportDateIso: result.reportDateIso,
+          isActive: function () { return thisRun === generation && chooser.isConnected; },
+          onChange: function () { if (thisRun === generation) draw(); },
+        });
+        review = currentReview;
+        try {
+          await currentReview.load();
+        } catch (reviewError) {
+          if (thisRun === generation && review === currentReview) {
+            currentReview.dispose();
+            review = null;
+            document.getElementById('knaashProgress').textContent =
+              'فُتح الكشف، لكن تعذر حفظ مراجعة الأسماء الآن. لا تتغير الأرصدة.';
+          }
+        }
+      } else {
+        document.getElementById('knaashProgress').textContent =
+          'يعرض الهاتف الكشف، لكن لا يستطيع حفظ مراجعة الأسماء حالياً. لا تتغير الأرصدة.';
+      }
+      if (!chooser.isConnected || thisRun !== generation) return;
+      choose('all');
+      if (review && review.canReview()) {
+        message('تطابقت مبالغ الكشف. يمكنك مراجعة الأسماء وحفظ تقدمك؛ لم يُنقل أي دين.', false);
+      } else if (review) {
+        message('تطابقت مبالغ الكشف، لكن هناك مراجعة لكشف آخر محفوظة على هذا الهاتف؛ لم يُنقل أي دين.', false);
+      } else {
+        message('تطابقت مبالغ الكشف، لكن حفظ مراجعة الأسماء غير متاح حالياً؛ لم يُنقل أي دين.', true);
+      }
+    } catch (e) {
+      if (thisRun !== generation) return;
+      var reason = e && e.message || '';
+      // لا تُظهر رسائل مكتبة PDF الداخلية؛ قد تحتوي تفاصيل من المستند الخاص.
+      message(/^[\u0600-\u06ff]/.test(reason) ? reason : 'تعذّر استخراج هذا PDF محلياً؛ لا تُستورد بيانات غير مؤكّدة.', true);
+      preview.style.display = 'none';
+    } finally {
+      chooser.value = '';
+    }
+  });
+})();
+</script>
+{% endif %}
+{% endblock %}

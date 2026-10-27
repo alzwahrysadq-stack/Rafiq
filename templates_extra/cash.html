@@ -1,0 +1,342 @@
+{% extends "base.html" %}
+{% block title %}دفتر النقدية{% endblock %}
+{% block bodyclass %}pad-b{% endblock %}
+{% block content %}
+<div class="h1">💵 دفتر النقدية</div>
+
+{% if cloud_shift_only %}
+<style>
+  #serverShift [hidden] { display:none !important; }
+  #serverShift .rfq-pending button { opacity:.55; pointer-events:none; }
+  #serverShift input { direction:ltr; text-align:right; }
+  #serverShift .rfq-device-id { direction:ltr; unicode-bidi:plaintext; overflow-wrap:anywhere; }
+</style>
+<section id="serverShift" class="card mt" data-local-uid="{{ u.id }}" data-local-role="{{ u.role }}">
+  <div class="h2">وردية المتجر المتصلة بالخادم — اختبار</div>
+  <p class="small muted">المالك يقرّر فتح وردية العامل من هنا. الأرقام المحلية أسفل الصفحة أرشيف مستقل وليست إذناً بالبيع.</p>
+  <div id="serverShiftMessage" class="flash error" role="status" aria-live="polite"></div>
+  <div id="serverShiftLogin">
+    <label for="serverShiftEmail">بريد حساب المتجر السحابي على هذا الهاتف</label>
+    <input id="serverShiftEmail" type="email" inputmode="email" autocomplete="username" placeholder="البريد المسجل في مشروع الاختبار">
+    <label for="serverShiftPassword">كلمة المرور السحابية</label>
+    <input id="serverShiftPassword" type="password" autocomplete="current-password" placeholder="لا تُرسلها في المحادثة">
+    <button id="serverShiftSignIn" type="button" class="btn p wide mt">دخول حساب المتجر</button>
+  </div>
+  <div id="serverShiftSession" hidden>
+    <p id="serverShiftIdentity" class="small"></p>
+    <div class="row wrap">
+      <button id="serverShiftRefresh" type="button" class="btn sm">تحديث حالة الخادم</button>
+      <button id="serverShiftSignOut" type="button" class="btn sm ghost">خروج من حساب الخادم</button>
+    </div>
+    <div id="serverShiftBody" class="mt"></div>
+  </div>
+</section>
+
+<section id="cloudCashLedger" class="card mt" data-local-uid="{{ u.id }}" data-local-role="{{ u.role }}">
+  <div class="h2">صندوق المتجر الخادمي — لا يشمل أرشيف هذا الهاتف</div>
+  <div id="cloudLedgerMessage" class="flash error" role="status" aria-live="polite">سجّل دخول المتجر من الأعلى، ثم حدّث حالة الوردية.</div>
+  <div id="cloudOwnerNotification" class="card tight mt" hidden>
+    <button id="cloudOwnerSound" type="button" class="btn sm ghost">تفعيل نغمة المالك أثناء فتح التطبيق فقط</button>
+    <p id="cloudOwnerEventNotice" class="small" role="status" hidden></p>
+    <p class="small muted">تحديث دوري عند ظهور الصندوق؛ ليس إشعار Push إذا أغلق الهاتف أو خرجت من التطبيق.</p>
+  </div>
+  <p class="small muted">الصندوق يحتسب العهدة المعتمدة ومبيعات النقد والتحصيل والسلف والمصروفات من الخادم. لا تخلط العهدة المحلية أدناه.</p>
+  <label for="cloudCashShift">وردية الصندوق المراد عرضها</label>
+  <select id="cloudCashShift"><option value="">— لا وردية خادمية مفتوحة —</option></select>
+  <div id="cloudCashSummary" class="sum1 mt">المدرج في الدرج الآن: —</div>
+  <div id="cloudCashEntries" class="ledger mt"></div>
+  <form id="cloudCashAdjustForm" class="card tight mt" hidden>
+    <div class="h2">حركة صندوق للمالك فقط</div>
+    <p class="small muted">السلفة النقدية للزبون تُصرف من شاشة الزبائن، وليست «مصروفاً» عاماً.</p>
+    <label for="cloudCashKind">نوع الحركة</label>
+    <select id="cloudCashKind"><option value="income">دخل يدوي</option><option value="expense">مصروف</option><option value="withdraw">سحب مالك</option></select>
+    <label for="cloudCashAmount">المبلغ بالريال اليمني</label><input id="cloudCashAmount" inputmode="decimal" required>
+    <label for="cloudCashReason">سبب موثّق (3 أحرف فأكثر)</label><input id="cloudCashReason" maxlength="200" required>
+    <button id="cloudCashAdjustSubmit" type="submit" class="btn amber wide mt">تأكيد حركة الصندوق الخادمي</button>
+  </form>
+  <p class="small muted"><a href="/pos">شاشة البيع الجديدة</a> • <a href="/customers">دفتر الزبائن والسلف</a></p>
+</section>
+
+<section class="card mt" aria-label="أرشيف نقدية هذا الهاتف فقط">
+  <div class="h2">أرشيف هذا الهاتف — للقراءة فقط</div>
+  <p class="small muted">لا يُنقل إلى الخادم أو الهاتف الآخر، ولا يُضاف إلى عهدة الوردية المتصلة. البيع والديون والمصروفات المحلية متوقفة حتى ربط الدفاتر بالخادم.</p>
+  {% if shift %}
+    <div class="row wrap"><span>وردية محلية سابقة مفتوحة: {{ shift.opening_cents|money }} {{ S.currency }} عهدة</span></div>
+    <div class="row wrap"><span>دخل الحركات المحلية المعروضة (حتى 200): {{ totals.in_all|money }} {{ S.currency }} • مصروفها: {{ totals.out_all|money }} {{ S.currency }}</span></div>
+    <p>الرصيد المتوقع محلياً: <b>{{ expected|money }} {{ S.currency }}</b> — ليس رصيد الخادم</p>
+  {% else %}<p class="muted">لا توجد وردية محلية مفتوحة على هذا الهاتف.</p>{% endif %}
+  {% if last %}<p class="small">آخر وردية محلية أُغلقت: {{ last.opened_at }} ← {{ last.closed_at }} • المتوقع {{ last.expected_cents|money }} {{ S.currency }}</p>{% endif %}
+  <div class="h2">حركات هذا الهاتف السابقة</div>
+  {% for m in movements %}
+  <div class="rowline"><span class="who"><b>{{ m.reason or m.note or K.get(m.kind, m.kind) }}</b>
+    <span class="sub">{{ m.created_at | slice(5, 16) }} • {{ K.get(m.kind, m.kind) }} • {{ m.uname or '—' }}</span></span>
+    <span class="amt">{{ m.amount_cents|money }}</span></div>
+  {% endfor %}
+  {% if not movements %}<p class="small muted">لا حركات محلية ظاهرة.</p>{% endif %}
+</section>
+{% else %}
+{% if shift %}
+  <!-- رقمَا كناش: الدخل / المصروف + الرصيد في الدرج -->
+  <div class="sum2 mt">
+    <div class="cell"><div class="lbl">الدخل (هذه الوردية)</div><div class="val g">{{ totals.in_all|money }}</div></div>
+    <div class="cell"><div class="lbl">المصروف (هذه الوردية)</div><div class="val r">{{ totals.out_all|money }}</div></div>
+  </div>
+  <div class="sum1 mt">
+    <span class="lbl">المفروض في الدرج الآن (رصيد النقدية):</span>
+    <b class="h2"> {{ expected|money }} {{ S.currency }}</b>
+  </div>
+
+  <div class="card tight mt">
+    <div class="row wrap">
+      <span class="pill g">وردية مفتوحة</span>
+      <span class="small muted">منذ {{ shift.opened_at | slice(11, 16) }} • افتتاحي {{ shift.opening_cents|money }}</span>
+      <div class="grow"></div>
+      <button class="btn sm amber" onclick="openModal('closeModal1')">🔒 جرد وإغلاق</button>
+    </div>
+    <div class="row wrap mt" style="gap:6px">
+      <span class="chipb g">بيع نقدي {{ totals.sale|money }}</span>
+      <span class="chipb g">تحصيل ديون {{ totals.collection|money }}</span>
+      <span class="chipb g">دخل يدوي {{ totals.income|money }}</span>
+      <span class="chipb r">مصروف {{ totals.expense|abs|money }}</span>
+      <span class="chipb r">سحب {{ totals.withdraw|abs|money }}</span>
+      <span class="chipb">حوالات {{ totals.m_transfer|money }}</span>
+      <span class="chipb">محافظ {{ totals.m_wallet|money }}</span>
+      <span class="chipb">إيداع {{ totals.m_deposit|money }}</span>
+      <span class="chipb amber">دين على الزبائن {{ totals.m_debt|money }}</span>
+    </div>
+  </div>
+{% else %}
+  <div class="flash error mt">لا توجد وردية مفتوحة — افتح وردية حتى يبدأ تسجيل المبيعات في الصندوق.</div>
+  <div class="card mt">
+    <div class="h2">فتح وردية جديدة</div>
+    <form method="POST" action="{{ url_for('cash_open') }}">
+      <label>النقد الموجود في الدرج الآن (بداية الوردية)</label>
+      <input name="amount" class="big" inputmode="decimal" placeholder="0" required>
+      <button class="btn p lg wide mt">🔓 فتح الوردية</button>
+    </form>
+  </div>
+{% endif %}
+
+{% if last %}
+<div class="card">
+  <div class="h2">آخر وردية أُغلقت</div>
+  <div class="row wrap small">
+    <span class="pill gray">{{ last.opened_at }} ← {{ last.closed_at }}</span>
+    <span>المتوقع: <b>{{ last.expected_cents|money }}</b></span>
+    <span>الفعلي: <b>{{ last.counted_cents|money }}</b></span>
+    <span class="pill {{ 'g' if last.difference_cents==0 else 'r' }}">
+      {{ 'مطابق ✔' if last.difference_cents==0 else ('زيادة ' if last.difference_cents>0 else 'عجز ') + (last.difference_cents|abs|money) }}</span>
+    <span class="muted">أغلقه: {{ last.cname }}</span>
+  </div>
+  {% if last.difference_cents != 0 and last.difference_reason %}
+    <div class="small mt" style="color:var(--amber)">سبب الفارق: <b>{{ last.difference_reason }}</b></div>
+  {% endif %}
+</div>
+{% endif %}
+
+<!-- حركات النقدية بالأسلوب الكناشي -->
+<div class="row mt"><div class="h2 grow">المعاملات {% if movements %}<span class="chipb">{{ movements|length }}</span>{% endif %}</div></div>
+<div class="ledger">
+  {% for m in movements %}
+    <div class="rowline">
+      <span class="circ {{ 'dn' if m.amount_cents>=0 else 'up' }}">{{ '+' if m.amount_cents>=0 else '−' }}</span>
+      <span class="who">
+        <span class="nm">{{ m.reason or m.note or K.get(m.kind, m.kind) }}</span>
+        <span class="sub">{{ m.created_at | slice(5, 16) }} • {{ K.get(m.kind, m.kind) }}
+          {% if m.note and m.reason %} • {{ m.note }}{% endif %}
+          • {{ m.uname or '—' }}</span>
+      </span>
+      <span class="amt">
+        <div class="a {{ 'g' if m.amount_cents>=0 else 'r' }}">{{ m.amount_cents|money }}</div>
+        <div class="t">{{ 'دخل' if m.amount_cents>=0 else 'مصروف' }}</div>
+      </span>
+    </div>
+  {% endfor %}
+  {% if not movements %}<div class="center muted" style="padding:22px">لا حركات بعد</div>{% endif %}
+</div>
+
+<!-- شريط كناش السفلي -->
+<div class="bottombar no-print">
+  <div class="in">
+    <button class="bbtn take" onclick="{% if shift %}openModal('inModal'){% else %}toast('افتح الوردية أولاً','err'){% endif %}">＋ دخل</button>
+    <button class="bbtn give" onclick="{% if shift %}openModal('expModal'){% else %}toast('افتح الوردية أولاً','err'){% endif %}">− مصروف</button>
+  </div>
+</div>
+
+<!-- نافذة دخل يدوي -->
+<div class="modal" id="inModal"><div class="sheet">
+  <div class="h2">＋ دخل يدوي إلى الدرج</div>
+  <div class="muted small">إيداع المالك، دخل متنوع… (بلا فاتورة).</div>
+  <form method="POST" action="{{ url_for('cash_income') }}">
+    <label>المبلغ</label><input name="amount" class="big center" inputmode="decimal" required placeholder="0">
+    <label>السبب <span class="req">إلزامي</span></label>
+    <select name="reason" required>
+      <option value="">— اختر السبب —</option>
+      {% for r in REASON_IN %}<option value="{{ r }}">{{ r }}</option>{% endfor %}
+    </select>
+    <label>ملاحظة (اختياري)</label><input name="note" placeholder="تفصيل إن أردت">
+    <div class="btn-grid mt">
+      <button class="btn p lg" style="grid-column:span 2">تسجيل الدخل</button>
+      <button type="button" class="btn ghost" style="grid-column:span 2" onclick="closeModal('inModal')">رجوع</button>
+    </div>
+  </form>
+</div></div>
+
+<!-- نافذة مصروف -->
+<div class="modal" id="expModal"><div class="sheet">
+  <div class="h2">− مصروف من الدرج</div>
+  <form method="POST" action="{{ url_for('cash_expense') }}">
+    <label>المبلغ</label><input name="amount" class="big center" inputmode="decimal" required>
+    <label>السبب <span class="req">إلزامي</span></label>
+    <select name="reason" required>
+      <option value="">— اختر السبب —</option>
+      {% for r in REASON_OUT %}<option value="{{ r }}">{{ r }}</option>{% endfor %}
+    </select>
+    <label>ملاحظة (اختياري)</label><input name="note" placeholder="كهرباء، نقل بضاعة، صيانة…">
+    <div class="btn-grid mt">
+      <button class="btn p lg" style="grid-column:span 2">حفظ</button>
+      <button type="button" class="btn ghost" style="grid-column:span 2" onclick="closeModal('expModal')">إلغاء</button>
+    </div>
+  </form>
+</div></div>
+
+<!-- سحب المالك -->
+{% if u.role=='owner' and shift %}
+<div class="card">
+  <div class="h2">🏦 سحب نقدية للمالك</div>
+  <form method="POST" action="{{ url_for('cash_withdraw') }}" class="mt">
+    <div class="row" style="align-items:flex-end">
+      <div class="grow"><label>المبلغ</label><input name="amount" class="big" inputmode="decimal" required></div>
+      <div class="grow"><label>السبب <span class="req">إلزامي</span></label>
+        <select name="reason" required>
+          <option value="">— اختر السبب —</option>
+          {% for r in REASON_OUT %}<option value="{{ r }}">{{ r }}</option>{% endfor %}
+        </select></div>
+    </div>
+    <label>ملاحظة (اختياري)</label><input name="note" placeholder="سحب شخصي">
+    <button class="btn amber wide mt">سحب من الدرج</button>
+  </form>
+</div>
+{% endif %}
+
+<!-- إغلاق الوردية: ورقة عدّ بالفئات -->
+{% if shift %}
+<div class="modal" id="closeModal1"><div class="sheet">
+  <div class="h2">🔒 جرد وإغلاق الوردية</div>
+  <div class="card tight">
+    <div class="row"><span class="grow muted">المفروض في الدرج (حسب النظام)</span>
+      <b id="expView" data-cents="{{ expected }}">{{ expected|money }} {{ S.currency }}</b></div>
+  </div>
+
+  <form method="POST" action="{{ url_for('cash_close') }}" id="closeForm">
+    <div class="h2 mt">عدّ النقود بالفئات</div>
+    <div class="hint">اكتب عدد كل فئة — يجمعها النظام لك تلقائياً.</div>
+    <table class="count">
+      {% for d in DENOM %}
+      <tr>
+        <td class="f">{{ d }} {{ S.currency }}</td>
+        <td class="x">×</td>
+        <td><input class="cnt" type="number" inputmode="numeric" min="0" step="1" value=""
+                   data-val="{{ d }}" placeholder="0"></td>
+        <td class="ttl" data-sub="{{ d }}">0</td>
+      </tr>
+      {% endfor %}
+      <tr class="sumrow">
+        <td colspan="3">المجموع المعدود</td>
+        <td class="ttl"><b id="countTotal">0</b></td>
+      </tr>
+    </table>
+
+    <label>أو اكتب المبلغ المعدود مباشرةً</label>
+    <input name="counted" id="countedInput" class="big center" inputmode="decimal" required placeholder="0">
+
+    <div class="card tight mt" id="diffBox">
+      <div class="row"><span class="grow muted">المفروض</span><b id="dExp">0</b></div>
+      <div class="row"><span class="grow muted">المعدود</span><b id="dCnt">0</b></div>
+      <div class="row"><span class="grow"><b>الفارق</b></span>
+        <b id="dDiff" class="pill gray">0</b></div>
+    </div>
+
+    <div id="reasonBox" class="hide">
+      <label>سبب الفارق <span class="req">إلزامي</span></label>
+      <select name="difference_reason" id="diffReason">
+        <option value="">— اختر سبب الفارق —</option>
+        {% for r in REASON_DIFF %}<option value="{{ r }}">{{ r }}</option>{% endfor %}
+      </select>
+      <div class="hint">لا يُغلق الدرج بفارق بلا سبب.</div>
+    </div>
+
+    <div class="btn-grid mt">
+      <button class="btn amber lg" style="grid-column:span 2">إغلاق ومطابقة</button>
+      <button type="button" class="btn ghost" style="grid-column:span 2" onclick="closeModal('closeModal1')">رجوع</button>
+    </div>
+  </form>
+</div></div>
+{% endif %}
+{% endif %}
+{% endblock %}
+{% block scripts %}
+{% if cloud_shift_only %}
+<script src="cloud-shift.js"></script>
+<script src="cloud-ledger.js"></script>
+<script>window.RafiqCloudShift.mount();window.RafiqCloudLedger.mount('cash');</script>
+{% else %}
+<script>
+(function(){
+  var expEl = document.getElementById('expView');
+  var EXP = parseInt(expEl ? (expEl.dataset.cents || '0') : '0', 10);
+  var inputs = Array.prototype.slice.call(document.querySelectorAll('.cnt'));
+  var counted = document.getElementById('countedInput');
+  var totalEl = document.getElementById('countTotal');
+  var dCnt = document.getElementById('dCnt');
+  var reasonBox = document.getElementById('reasonBox');
+  var reasonSel = document.getElementById('diffReason');
+  if(!counted) return;
+
+  function fmt(cents){
+    return (cents/100).toLocaleString('en-US', {minimumFractionDigits:0, maximumFractionDigits:0});
+  }
+  function updateDiff(){
+    var _raw = Math.round(parseFloat(String(counted.value || '0').replace(/,/g, '')) * 100) || 0;
+    var c = Math.round(_raw/100)*100;   // تقريب إلى ريال كامل
+    var diff = c - EXP;
+    if(dCnt) dCnt.textContent = fmt(c);
+    var el = document.getElementById('dDiff');
+    if(el){
+      el.textContent = (diff === 0 ? 'مطابق ✔'
+                        : (diff > 0 ? 'زيادة ' : 'عجز ') + fmt(Math.abs(diff)));
+      el.className = 'pill ' + (diff === 0 ? 'g' : 'r');
+    }
+    // سبب الفارق: يظهر فقط عند وجود فارق
+    if(reasonBox){
+      if(diff !== 0){
+        reasonBox.classList.remove('hide');
+        if(reasonSel) reasonSel.required = true;
+      } else {
+        reasonBox.classList.add('hide');
+        if(reasonSel){ reasonSel.required = false; reasonSel.value = ''; }
+      }
+    }
+  }
+  function refreshFromDenoms(){
+    var sum = 0;
+    inputs.forEach(function(inp){
+      var val = parseInt(inp.dataset.val, 10) * 100;
+      var n = parseInt(inp.value || '0', 10) || 0;
+      var sub = val * n;
+      sum += sub;
+      var cell = document.querySelector('.ttl[data-sub="' + inp.dataset.val + '"]');
+      if(cell) cell.textContent = n ? fmt(sub) : '0';
+    });
+    if(totalEl) totalEl.textContent = fmt(sum);
+    counted.value = fmt(sum);
+    updateDiff();
+  }
+
+  inputs.forEach(function(i){ i.addEventListener('input', refreshFromDenoms); });
+  counted.addEventListener('input', updateDiff);   // الكتابة المباشرة لا تُستبدل
+  updateDiff();
+})();
+</script>
+{% endif %}
+{% endblock %}

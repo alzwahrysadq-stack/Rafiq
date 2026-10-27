@@ -1,0 +1,91 @@
+/* أوضاع الطباعة: A4 أو حرارية أو الاثنان معاً (تُضبط من أزرار الفاتورة) */
+@media print{
+  body.print-a4 .receipt{display:none !important}
+  body.print-a4 .a4{display:block !important}
+  body.print-receipt .a4{display:none !important}
+  body.print-receipt .receipt{display:block !important}
+  body.print-both .receipt,body.print-both .a4{display:block !important}
+  body.print-both .a4{page-break-before:always}
+}
+
+/* ===== شاشة الدخول: أهم الأزرار تبقى ظاهرة على هاتف صغير ===== */
+@media screen and (max-width:900px){
+  .rafiq-login .wrap{padding:8px 10px calc(12px + env(safe-area-inset-bottom))}
+  .rafiq-login .login-card{margin:0 auto;padding:10px 12px}
+  .rafiq-login .login-logo{width:84px;max-width:36%;margin:0 auto 2px}
+  .rafiq-login .login-card .mt{margin-top:7px}
+  .rafiq-login .user-btn{min-height:44px;padding:5px 9px;gap:7px;font-size:.9rem;line-height:1.3;margin-bottom:5px}
+  .rafiq-login .avatar{width:30px;height:30px;flex:0 0 auto;font-size:.85rem}
+  .rafiq-login .pin-dots{margin:6px 0}
+  .rafiq-login .pin-dots span{width:13px;height:13px}
+  .rafiq-login .num-pad{gap:5px;margin-top:5px}
+  .rafiq-login .num-pad .btn{min-height:44px;padding:5px;font-size:1.1rem}
+  .rafiq-login #enterBtn{min-height:46px;padding:6px 10px;margin-top:8px;font-size:1rem}
+  .rafiq-login .login-card .hint{margin-top:5px;line-height:1.3}
+}
+@media screen and (max-width:900px) and (max-height:720px){
+  .rafiq-login .login-logo{width:70px}
+  .rafiq-login .user-btn{margin-bottom:3px}
+}
+
+/* ===== إضافة صنف: شبكة مضغوطة، أعمدة لا تزاحم الباركود والكاميرا ===== */
+.product-head,.card.product-card{max-width:720px;margin-inline:auto}
+.product-head{flex-wrap:wrap;gap:8px}
+.card.product-card{padding:14px}
+.product-fields{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px 10px}
+.product-fields .field{min-width:0}
+.product-fields .wide,.product-note{grid-column:1/-1}
+.product-fields label{margin:0 0 4px;font-size:.84rem;line-height:1.35}
+.product-fields input{min-height:44px;padding:8px 10px;font-size:1rem}
+.product-fields .scan-field{display:flex;gap:8px;align-items:stretch}
+.product-fields #bc{flex:1;min-width:0}
+.product-fields #bcCam{flex:0 0 auto;min-height:44px;padding:8px 11px;font-size:.9rem;white-space:nowrap}
+.product-note{font-size:.75rem;line-height:1.35;margin-top:-7px}
+.product-actions{grid-template-columns:repeat(2,minmax(0,1fr));margin-top:14px}
+.product-actions .btn{min-width:0;min-height:46px;padding:8px 12px;font-size:1rem}
+@media screen and (max-width:340px){
+  .product-fields{gap:10px 8px}
+  .product-fields label{font-size:.78rem}
+  .product-fields #bcCam{padding:8px;font-size:.82rem}
+}
+
+/* ===== فاتورة الهاتف: أدوات في صفوف قابلة للالتفاف، والمعاينة لا توسّع الشاشة ===== */
+.invoice-tools{max-width:760px;margin-inline:auto;display:grid;gap:8px}
+.invoice-tools-top{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px}
+.invoice-actions{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
+.invoice-actions .btn{min-width:0;min-height:44px;padding:8px 9px;line-height:1.3;text-align:center}
+@media screen and (min-width:700px){.invoice-actions{grid-template-columns:repeat(4,minmax(0,1fr))}}
+.invoice-page .receipt{width:100%;max-width:336px;overflow-wrap:anywhere;padding:12px 10px;font-size:13px}
+.invoice-page .receipt table{font-size:12px}
+.invoice-page .receipt td,.invoice-page .receipt th{vertical-align:top}
+.invoice-page .a4 .head{flex-wrap:wrap;gap:10px}
+.invoice-page .a4 th,.invoice-page .a4 td{overflow-wrap:anywhere}
+.invoice-page .invoice-totals{width:320px;max-width:100%;margin-inline-start:auto;margin-top:12px}
+@media screen and (max-width:640px){
+  .invoice-page .a4{padding:14px 10px;font-size:12px}
+  .invoice-page .a4 table{table-layout:fixed}
+  .invoice-page .a4 th,.invoice-page .a4 td{padding:4px 3px}
+}
+@media print{
+  .invoice-page .receipt{width:72mm;max-width:none;padding:0;margin:0;font-size:12px}
+  .invoice-page .receipt table{font-size:11.5px}
+  .invoice-page .a4{max-width:none}
+}
+
+/* ===== التقارير: الاختيار والتاريخ لا يوسّعان شاشة الهاتف ===== */
+.report-pick{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:8px;align-items:stretch}
+.report-pick input,.report-pick select{min-width:0}
+.report-pick .btn{min-width:116px;min-height:44px;padding:8px 10px;line-height:1.3;text-align:center}
+.report-date-form{display:grid;grid-template-columns:minmax(0,1fr) auto auto;align-items:center;gap:8px}
+.report-date-form input{min-width:0;min-height:44px}
+.report-date-form .btn{min-width:0;min-height:44px;padding:8px 10px;white-space:nowrap}
+@media screen and (max-width:360px){
+  .report-pick .btn{min-width:96px;padding:7px;font-size:.86rem}
+  .report-date-form{gap:5px}
+  .report-date-form .btn{padding:7px;font-size:.88rem}
+}
+
+/* عناصر الجهاز العائمة للّمس فقط، لا مكان لها على الفاتورة الورقية أو التقارير. */
+@media print{
+  #rafiqMic,#rafiqDrawer,#rafiqOverlay,.toast{display:none !important}
+}

@@ -1,0 +1,46 @@
+{% extends "base.html" %}
+{% block title %}لوحة المالك المتصلة{% endblock %}
+{% block content %}
+<div id="cloudDashboard" data-local-uid="{{ u.id }}" data-local-role="{{ u.role }}">
+  <div class="h1">لوحة صاحب المتجر — الخادم</div>
+  <p class="hint">أرقام المتجر الجديدة من قاعدة الاختبار فقط؛ لا تجمع عهدة أو ديون الهاتفين المحليين. أحدثها بالضغط أو أثناء فتح الشاشة.</p>
+  <div id="cloudLedgerMessage" class="flash error" role="status" aria-live="polite">ادخل حساب المتجر من الصندوق أولاً.</div>
+  <div id="cloudDashboardLocked" class="card mt"><a href="{{ url_for('cash') }}">افتح الصندوق للدخول بحساب المالك السحابي</a>.</div>
+  <div id="cloudDashboardActive" hidden>
+    <button id="cloudDashboardRefresh" type="button" class="btn sm ghost">تحديث أرقام الخادم</button>
+    <button id="cloudOwnerSound" type="button" class="btn sm ghost">تفعيل نغمة المالك أثناء فتح التطبيق فقط</button>
+    <p id="cloudOwnerEventNotice" class="small" role="status" hidden></p>
+    <p class="small muted">نغمة مقدمة التطبيق فقط بعد اللمس، لا Push خلفية.</p>
+    <div class="grid g4 mt" id="cloudDashboardStats"></div>
+    <div class="card mt"><div class="h2">الورديات المفتوحة وصندوقها الخادمي</div><div id="cloudDashboardTills"></div></div>
+    <div class="card mt"><div class="h2">أحدث فواتير المتجر الجديد</div><div id="cloudDashboardInvoices" class="ledger"></div></div>
+    <div class="btn-grid mt">
+      <a class="btn p" href="/remote-eye">👁️ العين عن بُعد — صفحة مستقلة</a>
+      <a class="btn amber" href="/customers">📒 الزبائن والديون</a>
+      <a class="btn ghost" href="/cash">💵 الصندوق والقرارات</a>
+    </div>
+    <form id="cloudProductForm" class="card mt">
+      <div class="h2">إنشاء صنف في المتجر الخادمي (للمالك)</div>
+      <p class="small muted">إنشاء الصنف لا يضيف مخزوناً تلقائياً؛ أدخل رصيده بحركة مستقلة موثقة أدناه. المنتجات المحلية القديمة أرشيف، لا تُنقل هنا.</p>
+      <label for="cloudProductName">الاسم</label><input id="cloudProductName" maxlength="120" required>
+      <label for="cloudProductBarcode">الباركود (اختياري)</label><input id="cloudProductBarcode" maxlength="80">
+      <label for="cloudProductPrice">سعر البيع بالريال اليمني</label><input id="cloudProductPrice" inputmode="decimal" required>
+      <label for="cloudProductCost">التكلفة التقريبية بالريال اليمني</label><input id="cloudProductCost" inputmode="decimal" required>
+      <button id="cloudProductSubmit" type="submit" class="btn blue wide mt">تأكيد إنشاء الصنف في الخادم</button>
+    </form>
+    <form id="cloudStockForm" class="card mt">
+      <div class="h2">حركة رصيد صنف خادمي — بإشراف المالك</div>
+      <label for="cloudStockProduct">الصنف</label><select id="cloudStockProduct"><option value="">— اختر صنفاً —</option></select>
+      <label for="cloudStockQty">كمية داخلة (حتى ثلاث منازل عشرية)</label><input id="cloudStockQty" inputmode="decimal" required>
+      <label for="cloudStockReason">سبب الحركة</label><input id="cloudStockReason" maxlength="200" placeholder="رصيد اختبار جديد" required>
+      <button id="cloudStockSubmit" type="submit" class="btn p wide mt">تأكيد إضافة الرصيد على الخادم</button>
+    </form>
+    <p class="small muted">الهامش المعروض تقديري قبل المصاريف والمشتريات والمرتجعات والضرائب؛ ليس ربحاً صافياً. صلاحية الأصناف والصور والموردون القديمون ما زالوا محليين، لا تنبيهات عالمية لهم هنا.</p>
+  </div>
+</div>
+{% endblock %}
+{% block scripts %}
+<script src="cloud-shift.js"></script>
+<script src="cloud-ledger.js"></script>
+<script>window.RafiqCloudLedger.mount('dashboard');</script>
+{% endblock %}

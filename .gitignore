@@ -1,0 +1,28 @@
+# بناء Gradle والأندرويد
+build/
+.gradle/
+.idea/
+*.iml
+node_modules/
+local.properties
+*.apk
+*.aab
+captures/
+.externalNativeBuild/
+.cxx/
+
+# قاعدة بيانات محلية (لا ترفع بيانات حقيقية)
+*.db
+*.sqlite
+*.db-journal
+*.db-wal
+*.db-shm
+
+# أنظمة التشغيل
+.DS_Store
+Thumbs.db
+__pycache__/
+
+/app/build/
+/build/
+rafiq-web-test.zip

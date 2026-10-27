@@ -1,0 +1,30 @@
+{% extends "base.html" %}
+{% block title %}تهيئة سحابة المتجر{% endblock %}
+{% block content %}
+<div class="h1">☁️ تهيئة سحابة المتجر</div>
+<div class="flash error mt" role="status">الإعداد المحلي لا يفعّل المزامنة أو واتساب أو روابط الفواتير. لن تُرفع بيانات زبائنك حتى يكتمل دخول صاحب المتجر وصلاحيات RLS وتُختبر المزامنة على هاتفين.</div>
+<div class="card mt" id="cloudBootstrapStatus" data-verified="false">
+  <div class="h2">حالة الربط</div>
+  <div class="muted small">{{ 'بيانات المشروع محفوظة على هذا الهاتف فقط؛ الاتصال غير مُتحقَّق منه' if configured else 'لم تُدخل بيانات مشروع هذا المتجر بعد' }}</div>
+  {% if configured %}<div class="hint mt">العنوان الحالي: <span dir="ltr">{{ project_url }}</span><br>المفتاح العام: محفوظ مشفّراً ولا يظهر مجدداً.</div>{% endif %}
+</div>
+<div class="card mt">
+  <div class="h2">عنوان مشروع Supabase والمفتاح العام</div>
+  <div class="hint">استخدم رابط <b>مشروعك</b> من لوحة Supabase، وليس موقع Supabase الرئيسي. لا تُدخل `service_role` أو `sb_secret_` أو كلمة المرور أو مفتاح رخصة المالك.</div>
+  <form method="post" action="/cloud/setup" autocomplete="off" id="cloudSetupForm">
+    <label for="cloudProjectUrl">Project URL</label>
+    <input id="cloudProjectUrl" name="project_url" type="url" inputmode="url" autocomplete="off" autocapitalize="off" spellcheck="false" dir="ltr" maxlength="160" required placeholder="https://[project-ref].supabase.co" value="{{ project_url or '' }}">
+    <label for="cloudPublishableKey">Anon / Publishable Key</label>
+    <input id="cloudPublishableKey" name="publishable_key" type="password" autocomplete="new-password" autocapitalize="off" spellcheck="false" dir="ltr" maxlength="4096" required value="" placeholder="المفتاح العام فقط، ليس المفتاح السري">
+    {% if configured %}<div class="check mt"><input id="cloudReplace" name="confirm_replace" type="checkbox" value="1"><label for="cloudReplace" style="margin:0">أفهم أن تغيير مشروع المتجر قد يوجّه البيانات إلى خادم آخر، وأريد استبدال الإعداد المحلي.</label></div>{% endif %}
+    <button class="btn p lg wide mt" type="submit">حفظ التهيئة على هذا الهاتف فقط</button>
+  </form>
+</div>
+{% if first_run and not configured %}
+<form method="post" action="/cloud/setup/skip" class="mt">
+  <button class="btn ghost wide" type="submit">العمل محلياً الآن — تخطي التهيئة السحابية مؤقتاً</button>
+</form>
+{% endif %}
+<div class="hint mt">حفظ الإعداد محمي بمفتاح Android Keystore على هذا الجهاز، وخارج النسخ الاحتياطية. يحتاج هاتف العامل إعداد انضمام موثوقاً لاحقاً؛ لا تنقل المفتاح الخاص أو بيانات الزبائن بين الهواتف يدوياً.</div>
+<a class="btn ghost wide mt" href="/settings">← العودة للإعدادات</a>
+{% endblock %}

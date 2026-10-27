@@ -1,0 +1,143 @@
+{% extends "base.html" %}
+{% block title %}تقارير اليوم{% endblock %}
+{% block content %}
+<div class="card no-print mt report-print">
+  <div class="h2">طباعة</div>
+  <form method="post" action="/invoice/by-number">
+    <label>فاتورة قديمة برقمها</label>
+    <div class="report-pick"><input name="n" inputmode="numeric" placeholder="رقم الفاتورة"><button class="btn p" type="submit">فتح للطباعة</button></div>
+  </form>
+  <form method="post" action="/customers/print-pick" class="mt">
+    <label>كشف حساب زبون</label>
+    <div class="report-pick"><select name="cid">{% for c in accounts_customers %}<option value="{{ c.id }}">{{ c.name }}</option>{% endfor %}</select><button class="btn p" type="submit">طباعة الكشف</button></div>
+  </form>
+  <form method="post" action="/suppliers/print-pick" class="mt">
+    <label>كشف حساب مورد</label>
+    <div class="report-pick"><select name="sid">{% for x in accounts_suppliers %}<option value="{{ x.id }}">{{ x.name }}</option>{% endfor %}</select><button class="btn p" type="submit">طباعة الكشف</button></div>
+  </form>
+</div>
+<div class="print-head">
+  {% if S.store_logo %}<img src="{{ S.store_logo }}" alt="">{% endif %}
+  <div><div class="t">{{ S.store_name or "المتجر" }}</div><div class="s">{{ S.store_name }} • تقرير {{ d }}</div></div>
+</div>
+<div class="row">
+  <div class="h1 grow">تقارير اليوم</div>
+</div>
+
+<div class="card mt">
+  <form method="get" class="report-date-form">
+    <input type="date" name="date" value="{{ d }}" class="grow">
+    <button class="btn p">عرض</button>
+    <a class="btn ghost" href="{{ url_for('reports') }}">اليوم</a>
+  </form>
+  <a class="btn gold wide mt" href="{{ url_for('cash_report', date=d) }}">💵 تقرير درج النقود لهذا اليوم</a>
+</div>
+
+<div class="grid g4 mt">
+  <div class="stat green"><div class="lbl">مبيعات {{ d }}</div><div class="val">{{ summary.total|money }}</div>
+    <div class="sub">{{ summary.count }} فاتورة ({{ summary.cancelled }} ملغاة)</div></div>
+  <div class="stat blue"><div class="lbl">صافي نقد البيع والتحصيل</div><div class="val">{{ summary.paid|money }}</div>
+    <div class="sub">يشمل تحصيل ديون {{ collections|money }} وخصم إلغاءات اليوم</div></div>
+  <div class="stat amber"><div class="lbl">آجل جديد اليوم</div><div class="val">{{ summary.due|money }}</div>
+    <div class="sub">إجمالي ديون الزبائن: {{ debts_total|money }}</div></div>
+  <div class="stat red"><div class="lbl">مصروفات + سحب</div>
+    <div class="val">{{ (expenses + withdraws)|money }}</div>
+    <div class="sub">مصروف {{ expenses|money }} • سحب {{ withdraws|money }}</div></div>
+  <div class="stat amber"><div class="lbl">سداد الموردين والمناديب اليوم</div>
+    <div class="val">{{ sup_pays_today|money }}</div>
+    <div class="sub">علينا لهم إجمالاً: {{ sup_debt_total|money }}</div></div>
+</div>
+
+<div class="card mt">
+  <div class="h2">أداء العاملين اليوم</div>
+  <div class="scroll-x">
+  <table class="tbl">
+    <tr><th>العامل</th><th>عدد الفواتير</th><th>إجمالي البيع</th><th>المدفوع (كل الوسائل)</th><th>الآجل</th></tr>
+    {% for w in by_worker %}
+      <tr><td><b>{{ w.name }}</b></td><td>{{ w.c }}</td><td>{{ w.t|money }}</td>
+          <td>{{ w.p|money }}</td><td>{{ (w.t - w.p)|money }}</td></tr>
+    {% endfor %}
+    {% if by_worker|length == 0 %}<tr><td colspan="5" class="center muted">لا مبيعات في هذا اليوم</td></tr>{% endif %}
+  </table>
+  </div>
+</div>
+
+<div class="card">
+  <div class="h2">الأكثر بيعاً اليوم</div>
+  <table class="tbl">
+    <tr><th>الصنف</th><th>الكمية</th><th>القيمة</th></tr>
+    {% for t in top %}
+      <tr><td>{{ t.name }}</td><td>{{ '%g'|format(t.q) }}</td><td>{{ t.t|money }}</td></tr>
+    {% endfor %}
+    {% if top|length == 0 %}<tr><td colspan="3" class="center muted">لا بيانات</td></tr>{% endif %}
+  </table>
+</div>
+
+<div class="card">
+  <div class="h2">فواتير اليوم</div>
+  <p class="small muted">الإلغاء متاح فقط أثناء وردية الفاتورة نفسها، وللفواتير التي لا تحتوي دفعة حوالة أو محفظة أو إيداع؛ ما عدا ذلك يلزم تسوية مرتجع منفصلة.</p>
+  <div class="scroll-x">
+  <table class="tbl">
+    <tr><th>رقم</th><th>الوقت</th><th>العامل</th><th>الزبون</th><th>الإجمالي</th><th>الدفع</th><th></th></tr>
+    {% for i in invoices %}
+      <tr>
+        <td>{{ i.number }}</td>
+        <td class="small">{{ i.created_at | slice(11, 16) }}</td>
+        <td class="small">{{ i.uname }}</td>
+        <td class="small">{{ i.cname or '—' }}</td>
+        <td><b>{{ i.total_cents|money }}</b></td>
+        <td>
+          {% if i.status=='cancelled' %}<span class="pill r">ملغاة</span>
+          {% elif i.payment_type=='cash' %}<span class="pill g">نقدي</span>
+          {% else %}<span class="pill a">آجل {{ i.due_cents|money }}</span>{% endif %}
+        </td>
+        <td class="row" style="gap:4px">
+          <a class="btn sm ghost" href="{{ url_for('invoice', iid=i.id) }}">عرض</a>
+          {% if i.status=='open' and u.role=='owner' %}
+          <form method="POST" action="{{ url_for('invoice_cancel', iid=i.id) }}"
+                onsubmit="return confirm('إلغاء الفاتورة {{ i.number }}؟ إذا توفرت شروط الإلغاء سيُعاد المخزون ويُرد النقد المسجّل فقط')">
+            <button class="btn sm red">إلغاء</button>
+          </form>
+          {% endif %}
+        </td>
+      </tr>
+    {% endfor %}
+    {% if invoices|length == 0 %}<tr><td colspan="7" class="center muted">لا فواتير</td></tr>{% endif %}
+  </table>
+  </div>
+</div>
+
+<div class="card">
+  <div class="h2">🚚 ما علينا للموردين والمناديب</div>
+  <div class="scroll-x">
+  <table class="tbl">
+    <tr><th>المورد/المندوب</th><th>النوع</th><th>علينا له</th><th>آخر زيارة</th><th>الهاتف</th></tr>
+    {% for s in sup_debts %}
+      <tr><td><a href="{{ url_for('supplier_detail', sid=s.id) }}">{{ s.name }}</a></td>
+          <td class="small">{{ 'مندوب' if s.kind=='delegate' else 'ثابت' }}{% if s.returnable %} • مرتجع{% endif %}</td>
+          <td><b style="color:#b45309">{{ s.balance_cents|money }}</b></td>
+          <td class="small">{{ s.last_visit_at | slice(0, 10)|ago if s.last_visit_at else 'لم يمر بعد' }}</td>
+          <td class="small">{{ s.phone or '—' }}</td></tr>
+    {% endfor %}
+    {% if sup_debts|length == 0 %}<tr><td colspan="5" class="center muted">لا مبالغ علينا — الحسابات مصفّاة ✔</td></tr>{% endif %}
+  </table>
+  </div>
+</div>
+
+<div class="card">
+  <div class="h2">أكبر الديون (تنبيه: تابع المتأخرين)</div>
+  <div class="scroll-x">
+  <table class="tbl">
+    <tr><th>الزبون</th><th>الرصيد</th><th>آخر فاتورة</th><th>الهاتف</th></tr>
+    {% for c in debts %}
+      <tr><td><a href="{{ url_for('customer_detail', cid=c.id) }}">{{ c.name }}</a></td>
+          <td><b style="color:#b91c1c">{{ c.balance_cents|money }}</b></td>
+          <td class="small">{{ c.last_invoice_at | slice(0, 10) if c.last_invoice_at else '—' }}</td>
+          <td class="small">{{ c.phone or '—' }}</td></tr>
+    {% endfor %}
+    {% if debts|length == 0 %}<tr><td colspan="4" class="center muted">لا ديون</td></tr>{% endif %}
+  </table>
+  </div>
+  <div class="hint">تنبيه «دين متأخر مدة طويلة» التلقائي يصل في المرحلة 2 (حساب عمر الدين تلقائياً).</div>
+</div>
+{% endblock %}

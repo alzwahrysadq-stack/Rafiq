@@ -1,0 +1,64 @@
+name: CI — اختبارات وبناء APK
+
+# يعمل عند كل رفع إلى أي فرع، وعند الضغط اليدوي من تبويب Actions
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  build-and-test:
+    name: اختبارات الوحدة + بناء APK
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: جلب الكود
+        uses: actions/checkout@v4
+
+      - name: تجهيز JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: تجهيز Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: تثبيت المنصّة وأدوات البناء
+        run: |
+          yes | sdkmanager --licenses > /dev/null || true
+          sdkmanager "platforms;android-34" "build-tools;34.0.0" > /dev/null
+
+      - name: تجهيز Gradle 8.7
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.7'
+
+      - name: تشغيل اختبارات الوحدة
+        run: gradle testDebugUnitTest --no-daemon --stacktrace
+
+      - name: بناء APK للتطوير
+        run: gradle assembleDebug --no-daemon --stacktrace
+
+      - name: رفع APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: rafiq-debug-apk
+          path: app/build/outputs/apk/debug/*.apk
+          if-no-files-found: error
+
+      - name: رفع تقارير الاختبارات
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-reports
+          path: app/build/reports/tests/
+          if-no-files-found: warn
+
+      - name: رفع مخطط قاعدة البيانات
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: room-schemas
+          path: app/schemas/
+          if-no-files-found: warn

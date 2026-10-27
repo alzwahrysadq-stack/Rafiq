@@ -1,0 +1,225 @@
+{% extends "base.html" %}
+{% block title %}كشف حساب {{ s.name }}{% endblock %}
+{% block bodyclass %}pad-b{% endblock %}
+{% block content %}
+
+<div class="row mt">
+  <a class="btn sm ghost" href="{{ url_for('suppliers') }}">‹ رجوع</a>
+  <div class="grow center">
+    <div class="h2" style="margin:0">{{ s.name }}</div>
+    <div class="muted small">
+      {% if s.kind == 'delegate' %}مندوب متجول • {{ PL.get(s.periodicity, s.periodicity) }}{% else %}مورد ثابت{% endif %}
+      {% if s.phone %} • <span style="direction:ltr">{{ s.phone }}</span>{% endif %}
+    </div>
+  </div>
+  <form method="POST" action="{{ url_for('supplier_visit', sid=s.id) }}">
+    <button class="btn sm" style="background:#d9f2e4;color:#0f5c46" title="تسجيل زيارة اليوم">✔</button>
+  </form>
+</div>
+
+<div class="card center mt" style="padding:16px">
+  <div class="muted small">علينا له (الرصيد)</div>
+  <div style="font-size:2.1rem; font-weight:800; color:{{ '#b45309' if s.balance_cents>0 else '#17795e' }}">
+    {{ s.balance_cents|money }} {{ S.currency }}
+  </div>
+  <div class="small">
+    {% if s.balance_cents > 0 %}<span class="chipb r">علينا له</span>
+    {% elif s.balance_cents < 0 %}<span class="chipb g">له عندنا (دفعنا زيادة)</span>
+    {% else %}<span class="chipb g">الحساب مصفّى ✔</span>{% endif %}
+    {% if s.returnable %}<span class="chipb g">يُرتجع الفائض</span>{% else %}<span class="chipb">لا رجعة فيه</span>{% endif %}
+    {% if s.overdue %}<span class="chipb r">متأخر عن موعده</span>{% endif %}
+    {% if s.due_today %}<span class="chipb">متوقع اليوم</span>{% endif %}
+  </div>
+  {% if s.goods %}<div class="muted small mt">البضاعة: {{ s.goods }}</div>{% endif %}
+</div>
+
+<div class="opts mt">
+  <a class="btn ghost" href="#ledger">📄 كشف المعاملات</a>
+    <a class="btn ghost" href="/suppliers/{{ s.id }}/print">🖨 طباعة كشف الحساب</a>
+  <a class="btn ghost" href="#visits">🗓 زياراته ({{ visits|length }})</a>
+  <a class="btn ghost" href="#waBox">📲 تذكير واتساب</a>
+  {% if u.role == 'owner' %}<button class="btn ghost" onclick="openModal('editModal')">✏️ تعديل البيانات</button>{% endif %}
+</div>
+
+<div class="row mt" id="ledger" style="margin-top:16px">
+  <div class="h2 grow">المعاملات <span class="chipb">{{ ev|length }}</span></div>
+</div>
+<div class="ledger mt">
+  {% for e in ev %}
+    <div class="rowline">
+      {% if e.kind == 'receive' %}
+        <span class="circ up">↑</span>
+      {% elif e.kind == 'pay' %}
+        <span class="circ dn">↓</span>
+      {% else %}
+        <span class="circ" style="background:#dbeafe;color:#1d4ed8">↩</span>
+      {% endif %}
+      <span class="who">
+        <span class="nm">
+          {% if e.kind == 'receive' %}استلمت بضاعة{% elif e.kind == 'pay' %}سدّدت له{% else %}رجّعت فائضاً{% endif %}
+          {% if e.ref %} — فاتورة {{ e.ref }}{% endif %}
+        </span>
+        <span class="sub">{{ e.ts | slice(0, 16) }}
+          {% if e.user %} • {{ e.user }}{% endif %}
+          {% if e.note %} • {{ e.note }}{% endif %}
+          • <span class="chipb {{ 'g' if e.balance_after<=0 else 'r' }}">الرصيد {{ e.balance_after|money }}</span>
+        </span>
+      </span>
+      <span class="amt">
+        <div class="a {{ 'g' if e.kind != 'receive' else 'r' }}">{{ e.amount|money }}</div>
+        <div class="t">{{ 'علينا له' if e.kind == 'receive' else ('سدّدنا' if e.kind == 'pay' else 'مرتجع') }}</div>
+      </span>
+    </div>
+  {% endfor %}
+  {% if not ev %}<div class="center muted" style="padding:22px">لا معاملات بعد — «استلمت» يسجّل أول بضاعة</div>{% endif %}
+</div>
+
+<div class="row mt" id="visits">
+  <div class="h2 grow">زياراته المسجّلة</div>
+</div>
+<div class="ledger mt">
+  {% for v in visits %}
+    <div class="rowline">
+      <span class="circ" style="background:#e2e8f0;color:#475569">🗓</span>
+      <span class="who"><span class="nm">مرّ المتجر</span>
+        <span class="sub">{{ v.created_at | slice(0, 16) }}{% if v.uname %} • {{ v.uname }}{% endif %}</span></span>
+      <span class="amt"><div class="a" style="color:#94a3b8">{{ v.created_at | slice(0, 10)|ago }}</div></span>
+    </div>
+  {% endfor %}
+  {% if not visits %}<div class="center muted" style="padding:22px">لا زيارات مسجّلة — زر «✔ مرّ اليوم» يسجّلها</div>{% endif %}
+</div>
+
+<!-- واتساب: تذكير المندوب -->
+<div class="card" id="waBox">
+  <div class="h2">📲 تذكير واتساب للمندوب</div>
+  <div class="muted small">راجع الرقم والرسالة ثم اضغط الإرسال — الإرسال يبقى بيدك دائماً.</div>
+  <label>رقم الواتساب</label>
+  <input id="waPhone" value="{{ s.phone }}" inputmode="tel">
+  <label>نص الرسالة</label>
+  <textarea id="waText" rows="4">مرحباً {{ s.name }} 👋
+نحن {{ S.store_name }} — {% if s.due_today %}اليوم موعد توريد {{ s.goods or 'البضاعة' }}{% elif s.overdue %}حان موعد توريد {{ s.goods or 'البضاعة' }} وننتظره منك{% else %}نحتاج توريد {{ s.goods or 'البضاعة' }}{% endif %}.
+{% if s.balance_cents>0 %}ومتبقٍ علينا لك {{ s.balance_cents|money }} {{ S.currency }} — جاهزون للسداد عند مرورك.{% endif %}
+شكراً لك 🌹</textarea>
+  <button class="btn wa-btn wide mt" id="waSend">فتح واتساب بالرسالة</button>
+</div>
+
+<!-- شريط كناش السفلي: سدّدت / استلمت / (رجّعت) -->
+<div class="bottombar no-print">
+  <div class="in" style="grid-template-columns:{{ '1fr 1fr 1fr' if s.returnable else '1fr 1fr' }}">
+    <button class="bbtn take" onclick="openModal('recvModal')">✔ استلمت</button>
+    {% if u.role == 'owner' %}
+      <button class="bbtn give" onclick="openModal('payModal')">✔ سدّدت</button>
+    {% else %}
+      <button class="bbtn give" style="opacity:.45" onclick="toast('السداد للمالك فقط','err')">✔ سدّدت</button>
+    {% endif %}
+    {% if s.returnable %}
+      <button class="bbtn" style="background:#dbeafe;color:#1d4ed8" onclick="openModal('retModal')">✔ رجّعت</button>
+    {% endif %}
+  </div>
+</div>
+
+<!-- نافذة استلمت -->
+<div class="modal" id="recvModal"><div class="sheet">
+  <div class="h2">✔ استلمت بضاعة من {{ s.name }}</div>
+  <div class="muted small">تُضاف إلى ما علينا له — نقدياً كانت أم آجلة، المبلغ هنا قيمة البضاعة المستلمة.</div>
+  <form method="POST" action="{{ url_for('supplier_receive', sid=s.id) }}">
+    <label>قيمة البضاعة</label>
+    <input name="amount" class="big center" inputmode="decimal" required autofocus placeholder="0">
+    <label>رقم فاتورة المندوب (اختياري)</label>
+    <input name="ref" placeholder="مثال: 4521">
+    <label>ملاحظة (اختياري)</label>
+    <input name="note" placeholder="مثال: روتي 50 ربطة">
+    <div class="btn-grid mt">
+      <button class="btn p lg" style="grid-column:span 2">تسجيل الاستلام</button>
+      <button type="button" class="btn ghost" style="grid-column:span 2" onclick="closeModal('recvModal')">رجوع</button>
+    </div>
+  </form>
+</div></div>
+
+<!-- نافذة سدّدت -->
+<div class="modal" id="payModal"><div class="sheet">
+  <div class="h2">✔ سدّدت لـ {{ s.name }}</div>
+  <div class="muted small">يخرج من درج الصندوق المفتوح الآن.</div>
+  <form method="POST" action="{{ url_for('supplier_pay', sid=s.id) }}">
+    <label>المبلغ المسدَّد</label>
+    <input name="amount" class="big center" inputmode="decimal" required placeholder="0">
+    {% if s.balance_cents > 0 %}
+    <div class="quick-amts mt">
+      <button type="button" class="btn" data-v="{{ (s.balance_cents/100) }}">كامل المبلغ {{ s.balance_cents|money }}</button>
+    </div>
+    {% endif %}
+    <label>ملاحظة (اختياري)</label><input name="note">
+    <div class="btn-grid mt">
+      <button class="btn p lg" style="grid-column:span 2">تسجيل السداد</button>
+      <button type="button" class="btn ghost" style="grid-column:span 2" onclick="closeModal('payModal')">رجوع</button>
+    </div>
+  </form>
+</div></div>
+
+<!-- نافذة رجّعت -->
+<div class="modal" id="retModal"><div class="sheet">
+  <div class="h2">✔ رجّعت فائضاً إلى {{ s.name }}</div>
+  <div class="muted small">مثل فائض الروتي والآيسكريم — يُخصم من ما علينا له.</div>
+  <form method="POST" action="{{ url_for('supplier_return', sid=s.id) }}">
+    <label>قيمة المرتجع</label>
+    <input name="amount" class="big center" inputmode="decimal" required placeholder="0">
+    <label>ملاحظة (اختياري)</label>
+    <input name="note" placeholder="مثال: فائض 12 ربطة">
+    <div class="btn-grid mt">
+      <button class="btn amber lg" style="grid-column:span 2">تسجيل المرتجع</button>
+      <button type="button" class="btn ghost" style="grid-column:span 2" onclick="closeModal('retModal')">رجوع</button>
+    </div>
+  </form>
+</div></div>
+
+{% if u.role == 'owner' %}
+<!-- نافذة تعديل البيانات (للمالك) -->
+<div class="modal" id="editModal"><div class="sheet">
+  <div class="h2">✏️ تعديل بيانات {{ s.name }}</div>
+  <div class="muted small">تصحيح الاسم أو الدورية أو نوع البضاعة، أو إيقاف التعامل إن انتهى.</div>
+  <form method="POST" action="{{ url_for('supplier_edit', sid=s.id) }}">
+    <label>الاسم</label><input name="name" value="{{ s.name }}" required>
+    <label>الهاتف (اختياري)</label><input name="phone" value="{{ s.phone }}" inputmode="tel">
+    <div class="row">
+      <div class="grow"><label>النوع</label>
+        <select name="kind">
+          <option value="delegate" {{ 'selected' if s.kind=='delegate' }}>مندوب متجول</option>
+          <option value="fixed" {{ 'selected' if s.kind=='fixed' }}>مورد ثابت</option>
+        </select></div>
+      <div class="grow"><label>الدورية (للمندوب)</label>
+        <select name="periodicity">
+          {% for k, v in PL.items() %}<option value="{{ k }}" {{ 'selected' if s.periodicity==k }}>{{ v }}</option>{% endfor %}
+        </select></div>
+    </div>
+    <label>نوع البضاعة</label><input name="goods" value="{{ s.goods }}" placeholder="مثال: روتي • ثلج • آيسكريم">
+    <div class="check">
+      <input type="checkbox" name="returnable" value="1" id="ret2" {{ 'checked' if s.returnable }}>
+      <label for="ret2" style="margin:0">يُرتجع الفائض (روتي، آيسكريم…) — أتركه فارغاً لمن لا رجعة فيه (الثلج)</label>
+    </div>
+    <label>ملاحظة (اختياري)</label><input name="note" value="{{ s.note }}">
+    <div class="btn-grid mt">
+      <button class="btn p lg" style="grid-column:span 2">حفظ التعديل</button>
+      <button type="button" class="btn ghost" style="grid-column:span 2" onclick="closeModal('editModal')">رجوع</button>
+    </div>
+  </form>
+  <form method="POST" action="{{ url_for('supplier_toggle', sid=s.id) }}" class="mt">
+    {% if s.active %}
+      <button class="btn ghost" style="width:100%; color:#b91c1c; border-color:#fecaca">⏸ إيقاف التعامل (لا يُحذف — يبقى كشفه محفوظاً)</button>
+    {% else %}
+      <button class="btn ghost" style="width:100%">▶ إعادة تفعيل التعامل</button>
+    {% endif %}
+  </form>
+</div></div>
+{% endif %}
+{% endblock %}
+
+{% block scripts %}
+<script>
+document.querySelectorAll('#payModal .quick-amts .btn').forEach(b=>{
+  b.onclick = ()=>{ document.querySelector('#payModal input[name=amount]').value = b.dataset.v; };
+});
+document.getElementById('waSend').onclick = ()=>{
+  waOpen(document.getElementById('waPhone').value, document.getElementById('waText').value);
+};
+</script>
+{% endblock %}

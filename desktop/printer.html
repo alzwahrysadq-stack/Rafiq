@@ -1,0 +1,60 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8">
+<title>إعدادات الطابعة</title>
+<style>
+@font-face{font-family:Tajawal;src:url(assets/Tajawal-Regular.woff2) format('woff2')}
+@font-face{font-family:Tajawal;src:url(assets/Tajawal-Bold.woff2) format('woff2');font-weight:700}
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:Tajawal,'Segoe UI',Tahoma,Arial,sans-serif;background:#0e2a47;color:#fff;padding:22px;overflow:hidden}
+h1{font-size:19px;margin-bottom:4px}
+.sub{color:#9db1c6;font-size:12.5px;margin-bottom:16px}
+.list{background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.1);border-radius:14px;padding:8px;max-height:300px;overflow:auto}
+.item{display:flex;align-items:center;gap:10px;padding:11px 12px;border-radius:10px;cursor:pointer;transition:.15s}
+.item:hover{background:rgba(255,255,255,.07)}
+.item.on{background:rgba(212,160,23,.16);border:1px solid rgba(212,160,23,.5)}
+.dot{width:10px;height:10px;border-radius:50%;background:#37465a;flex:none}
+.item.on .dot{background:#D4A017}
+.nm{font-size:13.5px;font-weight:700}
+.st{font-size:11px;color:#9db1c6}
+.row{display:flex;gap:10px;margin-top:18px}
+button{flex:1;padding:12px;border-radius:12px;border:0;font-family:inherit;font-size:13.5px;font-weight:700;cursor:pointer}
+.b1{background:#D4A017;color:#0e2a47}
+.b2{background:rgba(255,255,255,.12);color:#fff}
+.empty{padding:22px;text-align:center;color:#9db1c6;font-size:13px}
+</style>
+</head>
+<body>
+  <h1>الطابعة الحرارية</h1>
+  <div class="sub">اختر طابعة الكاونتر — تُطبع بها الفواتير والسندات مباشرة</div>
+  <div class="list" id="list"><div class="empty">جارٍ قراءة الطابعات…</div></div>
+  <div class="row">
+    <button class="b1" id="save">حفظ الاختيار</button>
+    <button class="b2" id="test">طباعة تجريبية</button>
+  </div>
+<script>
+let chosen=null;
+const list=document.getElementById('list');
+async function load(){
+  const printers=await window.desktopAPI.printers();
+  const s=await window.desktopAPI.settings();
+  chosen=s.printerName||null;
+  if(!printers.length){list.innerHTML='<div class="empty">لا توجد طابعات موصولة — وصّل الطابعة ثم أعد فتح هذه النافذة</div>';return;}
+  list.innerHTML='';
+  for(const p of printers){
+    const d=document.createElement('div');
+    d.className='item'+(p.name===chosen?' on':'');
+    d.innerHTML='<div class="dot"></div><div><div class="nm"></div><div class="st"></div></div>';
+    d.querySelector('.nm').textContent=p.displayName||p.name;
+    d.querySelector('.st').textContent=(p.isDefault?'الافتراضية • ':'')+(p.status||'جاهزة');
+    d.onclick=()=>{chosen=p.name;for(const x of list.children)x.classList.remove('on');d.classList.add('on');};
+    list.appendChild(d);
+  }
+}
+document.getElementById('save').onclick=()=>window.desktopAPI.savePrinter(chosen||'');
+document.getElementById('test').onclick=()=>window.desktopAPI.testPrint();
+load();
+</script>
+</body>
+</html>

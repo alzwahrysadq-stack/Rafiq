@@ -1,0 +1,38 @@
+{% extends "base.html" %}
+{% block title %}كشف حساب {{ c.name }}{% endblock %}
+{% block wrap %}
+<div class="wrap">
+  <div class="row no-print">
+    <div class="h1 grow">كشف حساب {{ c.name }}</div>
+    <button class="btn sm p" onclick="window.print()">🖨 طباعة</button>
+  </div>
+  <div class="a4 mt">
+    {% if S.store_logo %}<img src="{{ S.store_logo }}" alt="" style="max-height:70px;display:block;margin:0 auto 6px">{% endif %}
+    <h2>{{ S.store_name or 'المتجر' }}</h2>
+    <div class="center">كشف حساب زبون</div>
+    {% if not audit_ok %}<div class="center" style="color:#b91c1c;font-weight:bold">⚠ لا تعتمد هذا الكشف: مجموع الحركات لا يطابق الرصيد. راجع البيانات أولاً.</div>{% endif %}
+    <table>
+      <tr><td>الاسم</td><td>{{ c.name }}</td></tr>
+      <tr><td>رمز الزبون</td><td dir="ltr">{{ c.code }}</td></tr>
+      <tr><td>الهاتف</td><td dir="ltr">{{ c.phone }}</td></tr>
+      <tr><td>تاريخ الطباعة</td><td>{{ today }}</td></tr>
+    </table>
+    <table>
+      <tr><th>التاريخ</th><th>البيان</th><th>المدخل</th><th>أعطيت (دين)</th><th>أخذت / افتتاحي دائن</th><th>الرصيد بعده</th></tr>
+      {% for e in ev %}
+      <tr>
+        <td>{% if e.kind == 'credit_opening' %}قبل بدء النظام{% else %}{{ e.ts }}{% endif %}</td>
+        <td>{{ e.note }}</td>
+        <td>{{ e.user }}</td>
+        <td>{% if e.kind == 'given' %}{{ e.amount_fmt }}{% endif %}</td>
+        <td>{% if e.kind == 'taken' or e.kind == 'credit_opening' %}{{ e.amount_fmt }}{% endif %}</td>
+        <td>{{ e.balance_fmt }}</td>
+      </tr>
+      {% else %}
+      <tr><td colspan="6">لا توجد حركات</td></tr>
+      {% endfor %}
+    </table>
+    <div class="grand mt">{% if c.balance_cents > 0 %}الدين المتبقي: {{ c.balance_fmt }}{% elif c.balance_cents < 0 %}رصيد لصالح الزبون: {{ c.balance_fmt }}{% else %}الرصيد مسدّد: {{ c.balance_fmt }}{% endif %}</div>
+  </div>
+</div>
+{% endblock %}

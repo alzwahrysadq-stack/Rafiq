@@ -1,0 +1,154 @@
+{% extends "base.html" %}
+{% block title %}الموردون والمناديب{% endblock %}
+{% block content %}
+<div class="print-head">
+  {% if S.store_logo %}<img src="{{ S.store_logo }}" alt="">{% endif %}
+  <div><div class="t">{{ S.store_name or "المتجر" }}</div><div class="s">{{ S.store_name }} • الموردون والمناديب</div></div>
+</div>
+<div class="row">
+  <div class="h1 grow">🚚 الموردون والمناديب</div>
+</div>
+
+<div class="tabs2 mt">
+  <a href="{{ url_for('customers') }}">العملاء</a>
+  <a href="{{ url_for('suppliers') }}" class="on">الموردون</a>
+</div>
+
+<div class="sum2">
+  <div class="cell"><div class="lbl">استلمنا منهم (بضاعة)</div><div class="val g">{{ received_all|money }}</div></div>
+  <div class="cell"><div class="lbl">سدّدنا ورجّعنا</div><div class="val r">{{ (paid_all + returned_all)|money }}</div></div>
+</div>
+<div class="sum1 mt">
+  <span class="lbl">المتبقي علينا لهم:</span>
+  <b class="h2" style="color:{{ '#b45309' if total>0 else '#17795e' }}"> {{ total|money }} {{ S.currency }}</b>
+  <div class="small muted">{{ delegates }} مندوباً متجولاً • {{ fixed }} مورداً ثابتاً</div>
+</div>
+
+<!-- المتوقعون اليوم: القلب الزمني للمندوبين الـ35 -->
+<div class="card mt" style="border:1.5px solid #cfe8e0">
+  <div class="row">
+    <div class="h2 grow">📅 المتوقعون اليوم</div>
+    <span class="chipb {{ 'r' if today_list else 'g' }}">{{ today_list|length }}</span>
+  </div>
+  <div class="muted small">من دوريته (شبه يومي/أسبوعي/شهري) حان موعده حسب آخر زيارة — علّم «مرّ اليوم» عند مجيئه ولو ما اشترى.</div>
+
+  {% for s in today_list %}
+    <div class="rowline" style="border:1px solid var(--line); border-radius:12px; margin-top:10px; padding:10px">
+      <span class="avc {{ 'r' if s.overdue else '' }}">{{ s.name[0] }}</span>
+      <span class="who">
+        <span class="nm">{{ s.name }}
+          {% if s.overdue %}<span class="chipb r">متأخر</span>{% endif %}</span>
+        <span class="sub">
+          <span class="chipb">{{ PL.get(s.periodicity, s.periodicity) }}</span>
+          {% if s.goods %} • {{ s.goods }}{% endif %}
+          • {% if s.days == null %}لم يمر بعد{% else %}<span style="white-space:nowrap">{{ s.days }} يوم</span>{% endif %}
+        </span>
+      </span>
+      <span class="amt" style="display:flex; gap:6px; flex-direction:column">
+        <a class="btn sm p nowrap" style="min-width:96px" href="{{ url_for('supplier_detail', sid=s.id) }}">✔ استلام</a>
+        <form method="POST" action="{{ url_for('supplier_visit', sid=s.id) }}">
+          <input type="hidden" name="back" value="suppliers">
+          <button class="btn sm ghost nowrap" style="min-width:96px">مرّ اليوم</button>
+        </form>
+        {% if s.phone %}<button type="button" class="btn sm ghost nowrap" style="min-width:96px; color:#128c7e"
+          data-phone="{{ s.phone }}" data-name="{{ s.name }}" data-goods="{{ s.goods }}"
+          onclick="waRemind(this, event)">📲 تذكير</button>{% endif %}
+      </span>
+    </div>
+  {% endfor %}
+  {% if not today_list %}
+    <div class="center muted" style="padding:14px">لا أحد متوقع اليوم وفق الدوريات ✔ — ومن مرّ خارج الموعد سيظهر في القائمة أدناه.</div>
+  {% endif %}
+</div>
+
+<div class="card">
+  <form method="get" class="row">
+    <input name="q" value="{{ q }}" placeholder="🔍 ابحث بالاسم أو نوع البضاعة…" class="grow">
+    <button class="btn p">بحث</button>
+  </form>
+</div>
+
+{% if u.role == 'owner' %}
+<button class="btn blue wide mb" onclick="openModal('addSupModal')">➕ إضافة مورد / مندوب</button>
+{% else %}
+<div class="card mb center muted small">إضافة الموردين والمندوبين من صلاحية المالك — أبلغه بالاسم ليضيفه.</div>
+{% endif %}
+
+<div class="ledger">
+  {% for r in rows %}
+    <a href="{{ url_for('supplier_detail', sid=r.id) }}" class="rowline" style="color:inherit">
+      <span class="avc {{ 'r' if r.balance_cents>0 else ('g' if r.balance_cents<0 else '') }}">{{ r.name[0] }}</span>
+      <span class="who">
+        <span class="nm">{{ r.name }}
+          {% if r.overdue %}<span class="chipb r">متأخر</span>{% endif %}
+          {% if r.returnable %}<span class="chipb g">مرتجع</span>{% endif %}</span>
+        <span class="sub">
+          {% if r.kind == 'delegate' %}<span class="chipb">{{ PL.get(r.periodicity, r.periodicity) }}</span>{% else %}<span class="chipb">ثابت</span>{% endif %}
+          {% if r.goods %} • {{ r.goods }}{% endif %}
+          • {% if r.last_visit_at %}{{ r.last_visit_at | slice(0, 10)|ago }}{% else %}لم يمر بعد{% endif %}
+        </span>
+      </span>
+      <span class="amt">
+        {% if r.phone and r.overdue %}<button type="button" class="chipb" style="background:#e7f8f1; color:#128c7e; border:0; margin-bottom:4px; padding:6px 10px; font-size:.95rem"
+          data-phone="{{ r.phone }}" data-name="{{ r.name }}" data-goods="{{ r.goods }}"
+          onclick="waRemind(this, event)" title="تذكير واتساب">📲</button>{% endif %}
+        {% if r.balance_cents > 0 %}
+          <div class="a r">{{ r.balance_cents|money }}</div><div class="t">علينا له</div>
+        {% elif r.balance_cents < 0 %}
+          <div class="a g">{{ (-r.balance_cents)|money }}</div><div class="t">له عندنا</div>
+        {% else %}
+          <div class="a" style="color:#94a3b8">0</div><div class="t">مسدَّد ✔</div>
+        {% endif %}
+      </span>
+    </a>
+  {% endfor %}
+  {% if not rows %}<div class="center muted" style="padding:22px">لا موردين بعد — أضف أول مندوب</div>{% endif %}
+</div>
+
+{% if u.role == 'owner' %}
+<div class="modal" id="addSupModal"><div class="sheet">
+  <div class="h2">➕ إضافة مورد / مندوب</div>
+  <form method="POST" action="{{ url_for('supplier_add') }}">
+    <label>الاسم</label><input name="name" required autofocus placeholder="مثال: مندوب الروتي — أبو خالد">
+    <label>الهاتف (اختياري)</label><input name="phone" inputmode="tel">
+    <div class="row">
+      <div class="grow"><label>النوع</label>
+        <select name="kind">
+          <option value="delegate">مندوب متجول</option>
+          <option value="fixed">مورد ثابت</option>
+        </select></div>
+      <div class="grow"><label>الدورية (للمندوب)</label>
+        <select name="periodicity">
+          <option value="semi_daily">شبه يومي</option>
+          <option value="weekly" selected>أسبوعي</option>
+          <option value="monthly">شهري</option>
+          <option value="daily">يومي</option>
+          <option value="irregular">عند الحاجة</option>
+        </select></div>
+    </div>
+    <label>نوع البضاعة</label><input name="goods" placeholder="مثال: روتي • ثلج • آيسكريم • مشروبات">
+    <div class="check">
+      <input type="checkbox" name="returnable" value="1" id="ret">
+      <label for="ret" style="margin:0">يُرتجع الفائض (روتي، آيسكريم…) — أتركه فارغاً لمن لا رجعة فيه (الثلج)</label>
+    </div>
+    <label>ملاحظة (اختياري)</label><input name="note">
+    <div class="btn-grid mt">
+      <button class="btn p">حفظ</button>
+      <button type="button" class="btn ghost" onclick="closeModal('addSupModal')">إلغاء</button>
+    </div>
+  </form>
+</div></div>
+{% endif %}
+{% endblock %}
+
+{% block scripts %}
+<script>
+const SUP_MSG = "مرحباً {name} 👋\nنحن " + {{ S.store_name|tojson }} + " — حان موعد توريد {goods}.\nنرجو المرور اليوم، شكراً لك 🌹";
+function waRemind(btn, ev){
+  ev.preventDefault(); ev.stopPropagation();
+  const d = btn.dataset;
+  const txt = SUP_MSG.replace('{name}', d.name || '').replace('{goods}', (d.goods || 'البضاعة'));
+  waOpen(d.phone, txt);
+}
+</script>
+{% endblock %}
