@@ -21,24 +21,102 @@ jobs:
           distribution: temurin
           java-version: '17'
 
-      - name: تجهيز Android SDK
-        uses: android-actions/setup-android@v3
-
       - name: تثبيت المنصّة وأدوات البناء
         run: |
-          yes | sdkmanager --licenses > /dev/null || true
-          sdkmanager "platforms;android-34" "build-tools;34.0.0" > /dev/null
+          SDK_ROOT="${ANDROID_HOME:-/usr/local/lib/android/sdk}"
+          SDKM=$(find "$SDK_ROOT/cmdline-tools" -name sdkmanager -type f | head -1)
+          echo "sdkmanager: $SDKM"
+          yes | "$SDKM" --licenses > /dev/null || true
+          "$SDKM" "platforms;android-34" "build-tools;34.0.0" > /dev/null
 
       - name: تجهيز Gradle 8.7
         uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: '8.7'
 
+      - name: تجهيز Node.js لفحوص واجهة WebView
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: فحص دخول الواجهة ورمز الزبون السريع
+        run: |
+          npm install --no-save --no-package-lock --ignore-scripts jsdom@24.1.3
+          node tools/engine_login_test.js
+          node tools/customer_code_ui_test.js
+          node tools/knaash_pdf_parser_test.js
+          node tools/knaash_pdf_ui_test.js
+          node tools/knaash_review_ui_test.js
+          node tools/voice_ui_test.js
+          node tools/voice_commerce_ui_test.js
+          node tools/import_catalog_ui_test.js
+
       - name: تشغيل اختبارات الوحدة
         run: gradle testDebugUnitTest --no-daemon --stacktrace
 
+      - name: رفض مفتاح ترخيص زائف في بناء النشر
+        env:
+          RAFIQ_LICENSE_PUBKEY: not-a-real-public-key
+        run: |
+          if gradle :app:assembleRelease --no-daemon > "$RUNNER_TEMP/invalid-license-key.log" 2>&1; then
+            echo 'خطأ: بُني إصدار نشر بمفتاح ترخيص زائف'
+            exit 1
+          fi
+          if ! grep -q 'المفتاح العام للرخصة غير صالح' "$RUNNER_TEMP/invalid-license-key.log"; then
+            tail -n 35 "$RUNNER_TEMP/invalid-license-key.log"
+            exit 1
+          fi
+          if gradle :app:assemble --no-daemon > "$RUNNER_TEMP/invalid-general-assemble.log" 2>&1; then
+            echo 'خطأ: بُني إصدار نشر بلا مفتاح صالح عبر assemble العامة'
+            exit 1
+          fi
+          if ! grep -q 'المفتاح العام للرخصة غير صالح' "$RUNNER_TEMP/invalid-general-assemble.log"; then
+            tail -n 35 "$RUNNER_TEMP/invalid-general-assemble.log"
+            exit 1
+          fi
+          if RAFIQ_LICENSE_PUBKEY='' gradle :app:assembleRelease --no-daemon > "$RUNNER_TEMP/missing-license-key.log" 2>&1; then
+            echo 'خطأ: بُني إصدار نشر دون مفتاح عام'
+            exit 1
+          fi
+          if ! grep -q 'لم يُضبط RAFIQ_LICENSE_PUBKEY' "$RUNNER_TEMP/missing-license-key.log"; then
+            tail -n 35 "$RUNNER_TEMP/missing-license-key.log"
+            exit 1
+          fi
+          echo 'رفض المفتاح الزائف في assembleRelease وassemble العامة، ورفض المفتاح الغائب'
+
       - name: بناء APK للتطوير
         run: gradle assembleDebug --no-daemon --stacktrace
+
+      - name: اختبار إصدار الرخص في تطبيق المالك
+        run: gradle -p owner-app testDebugUnitTest --no-daemon --stacktrace
+
+      - name: بناء تطبيق المالك (رفيق للمالك)
+        run: gradle -p owner-app assembleDebug --no-daemon --stacktrace
+
+      - name: رفع تطبيق المالك
+        uses: actions/upload-artifact@v4
+        with:
+          name: rafiq-owner-apk
+          path: owner-app/app/build/outputs/apk/debug/*.apk
+          if-no-files-found: error
+
+      - name: بناء اختبار تكامل الرخصة (R8، ليس نسخة متجر)
+        env:
+          RAFIQ_LICENSE_PUBKEY: ${{ secrets.RAFIQ_LICENSE_PUBKEY }}
+        run: |
+          if [ -z "$RAFIQ_LICENSE_PUBKEY" ]; then
+            echo "تخطّي إصدار النشر: لم يُضبط السر RAFIQ_LICENSE_PUBKEY بعد"
+            exit 0
+          fi
+          gradle assembleRelease --no-daemon --stacktrace
+
+      - name: رفع اختبار الرخصة (لا يُسلَّم لمتجر قبل المزامنة والاستعادة)
+        if: ${{ hashFiles('app/build/outputs/apk/release/*.apk') != '' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: rafiq-license-integration-not-for-store
+          path: app/build/outputs/apk/release/*.apk
+          if-no-files-found: warn
 
       - name: رفع APK
         uses: actions/upload-artifact@v4
@@ -52,7 +130,9 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: test-reports
-          path: app/build/reports/tests/
+          path: |
+            app/build/reports/tests/
+            owner-app/app/build/reports/tests/
           if-no-files-found: warn
 
       - name: رفع مخطط قاعدة البيانات
